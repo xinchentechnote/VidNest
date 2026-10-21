@@ -1,26 +1,44 @@
 # VidNest 架构设计
 
-## 1. 技术选型（已核对当前稳定版本，2026-10）
+## 1. 技术选型（已核对当前稳定版本，2026-10，并经本机构建实测）
 
 | 组件 | 版本 | 说明 |
 |---|---|---|
 | Gradle | 9.8.2（wrapper） | 满足 AGP 9.4 的最低 9.6.0 要求 |
-| Android Gradle Plugin | 9.4.1 | 内置 Kotlin 2.4.20，不再使用 kotlin-android 插件 |
-| Kotlin | 内置 2.4.20 | Compose 插件用 org.jetbrains.kotlin.plugin.compose 2.4.21 |
-| KSP | 2.3.12 | KSP 2.3.0+ 与内置 Kotlin 兼容（官方迁移文档确认）；禁用 kapt |
+| Android Gradle Plugin | 9.4.1 | |
+| Kotlin | 2.3.21（独立 KGP） | 见下方"构建链决策" |
+| Compose 编译器插件 | org.jetbrains.kotlin.plugin.compose 2.3.21 | 与 KGP 同版本 |
+| KSP | 2.3.12 | Room 注解处理（禁用 kapt） |
 | Compose BOM | 2026.09.00 | Material 3 |
 | Media3 | 1.11.1 | exoplayer + ui |
 | Room | 2.8.5 | runtime/ktx/compiler/testing |
 | core-ktx | 1.19.1 | |
 | activity-compose | 1.13.0 | |
-| navigation-compose | 2.10.2 | |
+| navigation-compose | 2.10.2 | 要求 compileSdk 37 |
 | lifecycle | 2.11.0 | viewmodel-compose / runtime-compose |
 | datastore-preferences | 1.2.1 | 设置存储 |
 | coroutines | 1.11.0 | + test |
 | 测试 | junit 4.13.2 / robolectric 4.17 / androidx.test 1.7.0 / ext-junit 1.3.0 | |
 
-- compileSdk = 36，targetSdk = 36，minSdk = 24（覆盖 Android 7.0+，兼容 Android 13 媒体权限与旧版权限机制）。
+- **compileSdk = 37**（navigation-compose 2.10.2 等 16 个依赖要求 ≥37；SDK 37.0 平台已装），targetSdk = 36，minSdk = 24（覆盖 Android 7.0+，兼容 Android 13 媒体权限与旧版权限机制）。
 - 单模块 `:app`。MVP 规模下单模块足够，避免无价值的多模块拆分。
+
+### 构建链决策（重要，踩坑记录）
+
+AGP 9.4 默认"内置 Kotlin"（2.4.20）。实测在本机（Gradle 9.8.2 + JDK 17）上，
+内置 Kotlin + KSP2 + Room 2.8.5 组合处理 Room 实体存在 `[MissingType]` 类型解析失败
+（无论实体是否使用 companion/ForeignKey/Index）。按 AGP 官方迁移文档的退出方案处理：
+
+- `gradle.properties`：`android.builtInKotlin=false`、`android.newDsl=false`
+- 应用独立 `org.jetbrains.kotlin.android` 2.3.21（在根项目固定版本，模块以 id 引用）
+- KSP 2.3.12 + Room 2.8.5 正常工作
+
+另外两条已验证的规避规则（对应 KSP issue #2026）：
+
+1. `@Entity` 类体内部不声明 companion/成员函数（会触发 MissingType）；工厂函数放文件级顶层。
+2. 本地已实测：build cache 会掩盖 KSP 失败历史（FROM-CACHE 假成功），排查 KSP 问题一律加 `--no-build-cache`。
+
+AGP 10 移除上述开关后需重新评估构建链。
 
 ## 2. 分层与目录结构
 

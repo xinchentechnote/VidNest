@@ -13,15 +13,19 @@
 - [x] docs/testing-plan.md
 - [x] 版本选型核实（AGP 9.4.1 / 内置 Kotlin 2.4.20 / KSP 2.3.12 / Compose BOM 2026.09.00 / Media3 1.11.1 / Room 2.8.5，均经 Maven 元数据与官方文档核实）
 
-## 阶段 2：工程骨架与基础数据层 — ⬜
+## 阶段 2：工程骨架与基础数据层 — ✅
 
-- [ ] Gradle 工程（wrapper、版本目录、AGP 9 内置 Kotlin + KSP + Compose）
-- [ ] 首次编译通过（`assembleDebug`）
-- [ ] Room 实体 / DAO / 数据库（videos、playback_records、playback_sessions）
-- [ ] Repository
-- [ ] ServiceLocator + 基础导航 + 应用骨架
-- [ ] 权限请求框架与权限状态流
-- [ ] domain/policy 纯逻辑（PlayCountPolicy、ProgressPolicy、WatchStatus）+ 单元测试
+- [x] Gradle 工程（wrapper 9.8.2、版本目录；AGP 9.4.1 + 独立 KGP 2.3.21 + KSP 2.3.12 + Compose）
+- [x] 首次编译通过（`assembleDebug`，compileSdk 37 / target 36 / minSdk 24）
+- [x] Room 实体 / DAO / 数据库（videos、playback_records、playback_sessions，schema 已导出）
+- [x] Repository（VideoRepository / PlaybackRecordRepository / PlaybackSessionRepository）
+- [x] ServiceLocator + 基础导航 + 应用骨架 + 权限门控 UI
+- [x] domain/policy 纯逻辑（PlayCountPolicy、ProgressPolicy、WatchStatus）
+- [x] 单元测试 32 个全部通过（policy/formatters/WatchStatus/VideoDao-Robolectric）
+
+构建链踩坑记录（详见 docs/architecture.md §构建链决策）：AGP 9 内置 Kotlin 与 KSP2+Room 存在
+MissingType 兼容问题，已按官方文档退回独立 KGP + 旧版 DSL；@Entity 类体内禁用 companion/成员函数
+（ksp#2026）；排查 KSP 问题必须 --no-build-cache（cache 会产生 FROM-CACHE 假成功）。
 
 ## 阶段 3：视频库与文件夹浏览 — ⬜
 

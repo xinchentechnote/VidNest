@@ -11,9 +11,11 @@ import androidx.compose.ui.Modifier
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
+import com.vidnest.app.ui.folder.FolderScreen
 import com.vidnest.app.ui.library.LibraryScreen
 import com.vidnest.app.ui.navigation.Routes
 import com.vidnest.app.ui.theme.VidNestTheme
+import com.vidnest.app.ui.videos.AllVideosScreen
 
 class MainActivity : ComponentActivity() {
 
@@ -36,7 +38,20 @@ class MainActivity : ComponentActivity() {
                                 onFolderClick = { path ->
                                     navController.navigate(Routes.folder(path))
                                 },
+                                onAllVideosClick = {
+                                    navController.navigate(Routes.ALL_VIDEOS)
+                                },
                             )
+                        }
+                        composable(Routes.folderPattern()) { entry ->
+                            val path = entry.arguments?.getString("path").orEmpty()
+                            FolderScreen(
+                                folderPath = android.net.Uri.decode(path),
+                                onBack = { navController.popBackStack() },
+                            )
+                        }
+                        composable(Routes.ALL_VIDEOS) {
+                            AllVideosScreen(onBack = { navController.popBackStack() })
                         }
                     }
                 }

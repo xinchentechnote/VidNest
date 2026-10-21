@@ -12,6 +12,7 @@ class VidNestApp : Application() {
 
     override fun onCreate() {
         super.onCreate()
-        ServiceLocator.init(this)
+        ServiceLocator.init(this, applicationScope)
+        ServiceLocator.scanManager.registerMediaStoreObserver()
     }
 }

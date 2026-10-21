@@ -7,7 +7,10 @@ import com.vidnest.app.ServiceLocator
 object LibraryViewModelFactory {
     fun provide() = viewModelFactory {
         initializer {
-            LibraryViewModel(ServiceLocator.videoRepository)
+            LibraryViewModel(
+                videoRepository = ServiceLocator.videoRepository,
+                scanManager = ServiceLocator.scanManager,
+            )
         }
     }
 }

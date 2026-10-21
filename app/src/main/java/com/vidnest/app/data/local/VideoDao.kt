@@ -59,6 +59,10 @@ interface VideoDao {
     @Query("DELETE FROM videos WHERE volumeName = :volumeName")
     suspend fun deleteByVolume(volumeName: String): Int
 
+    /** 移动/重命名识别后删除旧身份行（级联删除已迁移走的旧记录） */
+    @Query("DELETE FROM videos WHERE id IN (:ids)")
+    suspend fun deleteByIds(ids: List<Long>): Int
+
     @Query("SELECT COUNT(*) FROM videos WHERE availabilityStatus = ${VideoEntity.STATUS_MISSING}")
     suspend fun countMissing(): Int
 

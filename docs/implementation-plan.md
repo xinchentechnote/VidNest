@@ -27,14 +27,14 @@
 MissingType 兼容问题，已按官方文档退回独立 KGP + 旧版 DSL；@Entity 类体内禁用 companion/成员函数
 （ksp#2026）；排查 KSP 问题必须 --no-build-cache（cache 会产生 FROM-CACHE 假成功）。
 
-## 阶段 3：视频库与文件夹浏览 — ⬜
+## 阶段 3：视频库与文件夹浏览 — ✅
 
-- [ ] MediaStoreVideoSource（API 24-28 用 DATA 推导目录；29+ 用 RELATIVE_PATH）
-- [ ] DeviceVideoScanner：全量扫描、分批事务 upsert、MISSING 标记、移动/重命名识别、幂等
-- [ ] MediaStoreObserver（ContentObserver + debounce）
-- [ ] VideoRepository（目录聚合、目录内列表、全库搜索、排序）
-- [ ] 库首页 / 文件夹页 / 全部视频页（加载、空态、无权限态）
-- [ ] 扫描合并与 DAO 测试
+- [x] MediaStoreVideoSource（API 24-28 用 DATA 推导目录；29+ 用 RELATIVE_PATH；取不到目录归入 unknown）
+- [x] DeviceVideoScanner：全量扫描、分批事务 upsert、MISSING 标记（数据源上报 coveredVolumes 区分"扫到 0 条"与"扫描失败"）、移动/重命名识别（唯一同名同大小才迁移记录）、幂等
+- [x] MediaStoreObserver（ContentObserver + 3s 防抖）+ ScanManager（应用级作用域、单飞、状态机、冷启动自动扫一次）
+- [x] VideoRepository 查询：目录聚合 / 目录内列表 / 全库搜索（LIKE 转义）/ 六种排序（RawQuery）
+- [x] 库首页（扫描进度横幅/摘要/错误、文件夹网格、全部视频入口）/ 文件夹页（排序菜单）/ 全部视频页（防抖搜索 + 状态筛选）
+- [x] 扫描合并与 DAO 测试（ScannerMergeTest 6 项 + MediaStoreRowMappingTest 5 项）
 
 ## 阶段 4：播放器与逐视频断点 — ⬜
 

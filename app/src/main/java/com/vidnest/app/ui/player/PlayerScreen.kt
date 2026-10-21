@@ -21,9 +21,11 @@ import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.FastForward
 import androidx.compose.material.icons.filled.FastRewind
 import androidx.compose.material.icons.filled.Pause
+import androidx.compose.material.icons.filled.ScreenRotation
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Speed
 import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -36,6 +38,7 @@ import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.Slider
 import androidx.compose.material3.Snackbar
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
@@ -80,6 +83,7 @@ fun PlayerScreen(
                     recordRepository = ServiceLocator.playbackRecordRepository,
                     sessionRepository = ServiceLocator.playbackSessionRepository,
                     writer = ServiceLocator.progressWriter,
+                    settingsRepository = ServiceLocator.settingsRepository,
                     controllerContext = ServiceLocator.appContext,
                 )
             }
@@ -142,8 +146,10 @@ private fun PlayerContent(
     viewModel: PlayerViewModel,
     onBack: () -> Unit,
 ) {
+    val context = LocalContext.current
     var controlsVisible by remember { mutableStateOf(true) }
     var showSpeedSheet by remember { mutableStateOf(false) }
+    var fullscreen by remember { mutableStateOf(false) }
     var dragging by remember { mutableStateOf(false) }
     var dragPosition by remember { mutableFloatStateOf(0f) }
 
@@ -235,10 +241,57 @@ private fun PlayerContent(
                     viewModel.seekTo(dragPosition.toLong())
                 },
                 onSpeedClick = { showSpeedSheet = true },
+                onToggleFullscreen = {
+                    val activity = context as? android.app.Activity
+                    if (activity != null) {
+                        fullscreen = !fullscreen
+                        activity.requestedOrientation = if (fullscreen) {
+                            android.content.pm.ActivityInfo.SCREEN_ORIENTATION_SENSOR_LANDSCAPE
+                        } else {
+                            android.content.pm.ActivityInfo.SCREEN_ORIENTATION_UNSPECIFIED
+                        }
+                    }
+                },
                 onBack = onBack,
                 modifier = Modifier.fillMaxSize(),
             )
         }
+    }
+
+    // 断点恢复询问（设置为“每次询问”时）
+    state.pendingResumeAsk?.let { resumeAt ->
+        AlertDialog(
+            onDismissRequest = { viewModel.onResumeAskFromStart() },
+            title = { Text("继续播放？") },
+            text = { Text("上次观看到 ${Formatters.duration(resumeAt)}。") },
+            confirmButton = {
+                TextButton(onClick = viewModel::onResumeAskContinue) { Text("继续播放") }
+            },
+            dismissButton = {
+                TextButton(onClick = viewModel::onResumeAskFromStart) { Text("从头播放") }
+            },
+        )
+    }
+
+    // 已看完视频再次打开询问（设置为“每次询问”时）
+    if (state.pendingEndAsk) {
+        AlertDialog(
+            onDismissRequest = {
+                viewModel.onEndAskCancelled()
+                onBack()
+            },
+            title = { Text("该视频已看完") },
+            text = { Text("要重新从头播放吗？") },
+            confirmButton = {
+                TextButton(onClick = viewModel::onEndAskReplay) { Text("从头播放") }
+            },
+            dismissButton = {
+                TextButton(onClick = {
+                    viewModel.onEndAskCancelled()
+                    onBack()
+                }) { Text("返回") }
+            },
+        )
     }
 
     if (showSpeedSheet) {
@@ -265,6 +318,7 @@ private fun ControlsOverlay(
     onDrag: (Float) -> Unit,
     onDragEnd: () -> Unit,
     onSpeedClick: () -> Unit,
+    onToggleFullscreen: () -> Unit,
     onBack: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
@@ -363,6 +417,9 @@ private fun ControlsOverlay(
                     style = MaterialTheme.typography.labelSmall,
                     color = Color.White,
                 )
+                IconButton(onClick = onToggleFullscreen) {
+                    Icon(Icons.Filled.ScreenRotation, contentDescription = "切换横竖屏", tint = Color.White)
+                }
             }
         }
     }

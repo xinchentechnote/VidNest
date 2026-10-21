@@ -16,6 +16,7 @@ import com.vidnest.app.ui.folder.FolderScreen
 import com.vidnest.app.ui.library.LibraryScreen
 import com.vidnest.app.ui.navigation.Routes
 import com.vidnest.app.ui.player.PlayerScreen
+import com.vidnest.app.ui.settings.SettingsScreen
 import com.vidnest.app.ui.theme.VidNestTheme
 import com.vidnest.app.ui.videos.AllVideosScreen
 
@@ -43,6 +44,9 @@ class MainActivity : ComponentActivity() {
                                 onAllVideosClick = {
                                     navController.navigate(Routes.ALL_VIDEOS)
                                 },
+                                onSettingsClick = {
+                                    navController.navigate(Routes.SETTINGS)
+                                },
                             )
                         }
                         composable(Routes.folderPattern()) { entry ->
@@ -57,6 +61,9 @@ class MainActivity : ComponentActivity() {
                                     navController.navigate(Routes.detail(videoId))
                                 },
                             )
+                        }
+                        composable(Routes.SETTINGS) {
+                            SettingsScreen(onBack = { navController.popBackStack() })
                         }
                         composable(Routes.ALL_VIDEOS) {
                             AllVideosScreen(

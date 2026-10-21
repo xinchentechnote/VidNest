@@ -40,7 +40,9 @@ fun FolderScreen(
     val viewModel: FolderViewModel = viewModel(
         key = folderPath,
         factory = viewModelFactory {
-            initializer { FolderViewModel(folderPath, ServiceLocator.videoRepository) }
+            initializer {
+                FolderViewModel(folderPath, ServiceLocator.videoRepository, ServiceLocator.settingsRepository)
+            }
         },
     )
     val state by viewModel.uiState.collectAsStateWithLifecycle()

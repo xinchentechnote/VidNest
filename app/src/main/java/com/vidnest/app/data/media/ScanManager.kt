@@ -6,6 +6,7 @@ import android.net.Uri
 import android.os.Handler
 import android.os.Looper
 import android.provider.MediaStore
+import com.vidnest.app.data.settings.SettingsRepository
 import com.vidnest.app.util.MediaPermissions
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
@@ -13,17 +14,19 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import java.util.concurrent.atomic.AtomicBoolean
 
 /**
- * 扫描编排：状态机 + 单飞（同一时刻至多一次扫描）+ 冷启动一次自动扫描 + MediaStore 变更监听。
- * 扫描在应用级作用域执行，离开页面不取消。
+ * 扫描编排：状态机 + 单飞 + 冷启动一次自动扫描 + MediaStore 变更监听。
+ * 数据源 = MediaStore + 已授权的 SAF 目录（每次扫描前按设置组装）。
  */
 class ScanManager(
     private val context: Context,
-    private val scanner: DeviceVideoScanner,
+    private val settingsRepository: SettingsRepository,
     private val appScope: CoroutineScope,
+    private val createScanner: suspend (sources: List<VideoSource>) -> DeviceVideoScanner,
 ) {
 
     sealed interface State {
@@ -44,6 +47,13 @@ class ScanManager(
 
     private var observerJob: Job? = null
 
+    private suspend fun buildSources(): List<VideoSource> = buildList {
+        add(MediaStoreVideoSource(context))
+        settingsRepository.safTrees.first().forEach { tree ->
+            runCatching { add(SafVideoSource(context, Uri.parse(tree))) }
+        }
+    }
+
     fun startScan(auto: Boolean = false) {
         if (auto && autoScannedThisProcess) return
         if (!scanInFlight.compareAndSet(false, true)) return
@@ -53,6 +63,7 @@ class ScanManager(
                     _state.value = State.Failed("尚未授予视频访问权限")
                     return@launch
                 }
+                val scanner = createScanner(buildSources())
                 _state.value = State.Scanning(0)
                 val result = scanner.fullScan { found ->
                     _state.value = State.Scanning(found)

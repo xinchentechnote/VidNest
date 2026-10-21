@@ -3,11 +3,11 @@ package com.vidnest.app
 import android.content.Context
 import com.vidnest.app.data.local.VidNestDatabase
 import com.vidnest.app.data.media.DeviceVideoScanner
-import com.vidnest.app.data.media.MediaStoreVideoSource
 import com.vidnest.app.data.media.ScanManager
 import com.vidnest.app.data.repository.PlaybackRecordRepository
 import com.vidnest.app.data.repository.PlaybackSessionRepository
 import com.vidnest.app.data.repository.VideoRepository
+import com.vidnest.app.data.settings.SettingsRepository
 import com.vidnest.app.playback.ProgressWriter
 import kotlinx.coroutines.CoroutineScope
 
@@ -26,6 +26,8 @@ object ServiceLocator {
     lateinit var playbackSessionRepository: PlaybackSessionRepository
         private set
     lateinit var progressWriter: ProgressWriter
+        private set
+    lateinit var settingsRepository: SettingsRepository
         private set
     lateinit var scanManager: ScanManager
         private set
@@ -47,13 +49,21 @@ object ServiceLocator {
             playbackRecordRepository = PlaybackRecordRepository(database, database.playbackRecordDao())
             playbackSessionRepository = PlaybackSessionRepository(database, database.playbackSessionDao())
             progressWriter = ProgressWriter(database, playbackRecordRepository, playbackSessionRepository)
-            val scanner = DeviceVideoScanner(
-                db = database,
-                videoDao = database.videoDao(),
-                recordDao = database.playbackRecordDao(),
-                sources = listOf(MediaStoreVideoSource(context)),
-            )
-            scanManager = ScanManager(context, scanner, applicationScope)
+            settingsRepository = SettingsRepository(context)
+            val videoDao = database.videoDao()
+            val recordDao = database.playbackRecordDao()
+            scanManager = ScanManager(
+                context = context,
+                settingsRepository = settingsRepository,
+                appScope = applicationScope,
+            ) { sources ->
+                DeviceVideoScanner(
+                    db = database,
+                    videoDao = videoDao,
+                    recordDao = recordDao,
+                    sources = sources,
+                )
+            }
             initialized = true
         }
     }

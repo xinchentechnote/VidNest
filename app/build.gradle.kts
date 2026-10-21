@@ -77,6 +77,7 @@ dependencies {
     ksp(libs.room.compiler)
 
     implementation(libs.datastore.preferences)
+    implementation(libs.androidx.documentfile)
     implementation(libs.coroutines.android)
 
     testImplementation(libs.junit)

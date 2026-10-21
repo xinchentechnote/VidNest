@@ -44,7 +44,9 @@ fun AllVideosScreen(
 ) {
     val viewModel: AllVideosViewModel = viewModel(
         factory = viewModelFactory {
-            initializer { AllVideosViewModel(ServiceLocator.videoRepository) }
+            initializer {
+                AllVideosViewModel(ServiceLocator.videoRepository, ServiceLocator.settingsRepository)
+            }
         },
     )
     val state by viewModel.uiState.collectAsStateWithLifecycle()

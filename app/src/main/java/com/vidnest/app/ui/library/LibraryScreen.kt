@@ -20,6 +20,7 @@ import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Folder
 import androidx.compose.material.icons.filled.ManageSearch
+import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.PlayCircle
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material3.Button
@@ -53,6 +54,7 @@ import com.vidnest.app.util.MediaPermissions
 fun LibraryScreen(
     onFolderClick: (String) -> Unit,
     onAllVideosClick: () -> Unit,
+    onSettingsClick: () -> Unit = {},
     viewModel: LibraryViewModel = viewModel(factory = LibraryViewModelFactory.provide()),
 ) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
@@ -75,6 +77,9 @@ fun LibraryScreen(
                 actions = {
                     IconButton(onClick = onAllVideosClick) {
                         Icon(Icons.Filled.Search, contentDescription = "搜索全部视频")
+                    }
+                    IconButton(onClick = onSettingsClick) {
+                        Icon(Icons.Filled.Settings, contentDescription = "设置")
                     }
                     IconButton(onClick = { viewModel.rescan() }) {
                         Icon(Icons.Filled.ManageSearch, contentDescription = "重新扫描")

@@ -29,7 +29,10 @@ jobs:
       - name: 配置 Android SDK（Platform 37）
         run: |
           yes | "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" --licenses > /dev/null || true
-          "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" "platforms;android-37" > /dev/null
+          # SDK 37 起平台采用 minor 版本命名（android-37.0）；两种包名都不可用时由 AGP 自动下载
+          "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" "platforms;android-37.0" > /dev/null 2>&1 || \
+            "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" "platforms;android-37" > /dev/null 2>&1 || \
+            echo "sdkmanager 无该平台包，交由 AGP 自动下载"
 
       - name: 单元测试与静态检查
         run: ./gradlew testDebugUnitTest lintDebug --stacktrace

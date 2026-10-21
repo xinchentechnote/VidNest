@@ -45,14 +45,16 @@ MissingType 兼容问题，已按官方文档退回独立 KGP + 旧版 DSL；@En
 - [x] 断点恢复：ProgressPolicy.resolveResumePosition（completed→0、无效进度→0、时长变化校验）
 - [x] 测试：ProgressWriterTest（快速切换 ABC 串号/并发交错/同事务计数）+ PlaybackCoordinatorTest（保存时机 7 项），共 55 个本地测试通过
 
-## 阶段 5：播放次数与观看统计 — ⬜
+## 阶段 5：播放次数与观看统计 — ✅
 
-- [ ] playback_sessions 表 + 会话领养/清理
-- [ ] 实际播放时长累计（暂停不计、seek 跳变防护、倍速按媒体时间）
-- [ ] 计数落库（与断点同事务）、每会话至多一次
-- [ ] WatchStatus 全局统一 + 列表徽标
-- [ ] 视频详情页（播放次数、上次时间/位置、状态）
-- [ ] 计数 policy / 会话仓库测试
+- [x] playback_sessions 表 + 24h 会话领养 + 启动清理（counted 与过期未计数）
+- [x] 实际播放时长累计：暂停不累计、seek 跳变防护（PlayerController tick 增量）、倍速按媒体时间
+- [x] 计数落库：达到 PlayCountPolicy 阈值 → CountReached（playCount+1 与 counted 标记与断点同事务），每会话至多一次
+- [x] 进程被杀：SessionTick 周期落库 + 领养继续累计（测试覆盖：不丢失不重复）
+- [x] 播放失败：放弃未计数会话（不计数、不再领养）
+- [x] 视频详情页：观看状态/播放次数/最近播放/上次位置/完成状态 + 媒体信息 + 播放入口
+- [x] 列表项详情入口；WatchStatus 全局统一徽标（阶段3已接）
+- [x] 测试：PlaybackSessionRepositoryTest 6 项 + PlayCountFlowTest 7 项（端到端 coordinator→writer→Room）
 
 ## 阶段 6：完善 UI 与异常处理 — ⬜
 

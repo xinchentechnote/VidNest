@@ -12,6 +12,7 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.PlayArrow
+import androidx.compose.material.icons.outlined.Info
 import androidx.compose.material.icons.filled.PlayCircle
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
@@ -30,7 +31,12 @@ import com.vidnest.app.util.Formatters
  * 名称 + 时长/大小/分辨率 + 播放次数 + 观看状态。
  */
 @Composable
-fun VideoListItem(video: Video, modifier: Modifier = Modifier, onClick: (() -> Unit)? = null) {
+fun VideoListItem(
+    video: Video,
+    modifier: Modifier = Modifier,
+    onClick: (() -> Unit)? = null,
+    onInfoClick: (() -> Unit)? = null,
+) {
     Row(
         modifier = modifier
             .fillMaxWidth()
@@ -96,6 +102,24 @@ fun VideoListItem(video: Video, modifier: Modifier = Modifier, onClick: (() -> U
                         )
                         Text(
                             text = "${video.playback.playCount}",
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                    }
+                }
+                if (onInfoClick != null) {
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        modifier = Modifier.clickable(onClick = onInfoClick),
+                    ) {
+                        Icon(
+                            imageVector = Icons.Outlined.Info,
+                            contentDescription = "查看详情",
+                            modifier = Modifier.size(14.dp),
+                            tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                        Text(
+                            text = "详情",
                             style = MaterialTheme.typography.labelSmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                         )

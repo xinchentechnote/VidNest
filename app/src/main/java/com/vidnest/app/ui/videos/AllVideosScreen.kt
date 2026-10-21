@@ -40,6 +40,7 @@ import com.vidnest.app.ui.components.VideoListItem
 fun AllVideosScreen(
     onBack: () -> Unit,
     onVideoClick: (Long) -> Unit = {},
+    onVideoInfoClick: (Long) -> Unit = {},
 ) {
     val viewModel: AllVideosViewModel = viewModel(
         factory = viewModelFactory {
@@ -104,7 +105,11 @@ fun AllVideosScreen(
                 } else {
                     LazyColumn {
                         items(state.videos, key = { it.id }) { video ->
-                            VideoListItem(video = video, onClick = { onVideoClick(video.id) })
+                            VideoListItem(
+                                video = video,
+                                onClick = { onVideoClick(video.id) },
+                                onInfoClick = { onVideoInfoClick(video.id) },
+                            )
                         }
                     }
                 }

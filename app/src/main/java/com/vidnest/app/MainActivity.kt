@@ -11,6 +11,7 @@ import androidx.compose.ui.Modifier
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
+import com.vidnest.app.ui.detail.VideoDetailScreen
 import com.vidnest.app.ui.folder.FolderScreen
 import com.vidnest.app.ui.library.LibraryScreen
 import com.vidnest.app.ui.navigation.Routes
@@ -52,6 +53,9 @@ class MainActivity : ComponentActivity() {
                                 onVideoClick = { videoId ->
                                     navController.navigate(Routes.player(videoId))
                                 },
+                                onVideoInfoClick = { videoId ->
+                                    navController.navigate(Routes.detail(videoId))
+                                },
                             )
                         }
                         composable(Routes.ALL_VIDEOS) {
@@ -60,6 +64,17 @@ class MainActivity : ComponentActivity() {
                                 onVideoClick = { videoId ->
                                     navController.navigate(Routes.player(videoId))
                                 },
+                                onVideoInfoClick = { videoId ->
+                                    navController.navigate(Routes.detail(videoId))
+                                },
+                            )
+                        }
+                        composable(Routes.detailPattern()) { entry ->
+                            val videoId = entry.arguments?.getString("videoId")?.toLongOrNull() ?: 0L
+                            VideoDetailScreen(
+                                videoId = videoId,
+                                onBack = { navController.popBackStack() },
+                                onPlay = { navController.navigate(Routes.player(videoId)) },
                             )
                         }
                         composable(Routes.playerPattern()) { entry ->

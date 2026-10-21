@@ -122,6 +122,7 @@ class PlayerViewModel(
             controller.state.collect { cs ->
                 val err = cs.error ?: return@collect
                 if (playerError.value == null) {
+                    // onError 内部会保存最后位置并放弃未计数会话（失败播放不计入）
                     coordinator.onError()
                     val isIo = err.errorCode == PlaybackException.ERROR_CODE_IO_UNSPECIFIED ||
                         err.errorCode == PlaybackException.ERROR_CODE_IO_NETWORK_CONNECTION_FAILED ||
@@ -142,7 +143,13 @@ class PlayerViewModel(
     }
 
     private fun onControllerTick(positionMs: Long, durationMs: Long, isPlaying: Boolean, mediaDeltaMs: Long) {
-        coordinator.onTick(positionMs, durationMs, controller.state.value.speed, isPlaying)
+        coordinator.onTick(
+            positionMs = positionMs,
+            durationMs = durationMs,
+            speed = controller.state.value.speed,
+            isPlaying = isPlaying,
+            mediaDeltaMs = mediaDeltaMs,
+        )
     }
 
     fun togglePlay() {

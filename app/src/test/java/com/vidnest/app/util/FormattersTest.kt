@@ -38,8 +38,16 @@ class FormattersTest {
     fun `时间格式化`() {
         assertEquals("--", Formatters.dateTime(0))
         assertEquals("--", Formatters.dateTime(-5))
-        // epoch 秒 0 (1970-01-01 08:00 北京时间) 按 UTC+8 计算
-        val formatted = Formatters.dateTime(1, isSeconds = true)
-        assertEquals("1970-01-01 08:00", formatted)
+        // 时区无关：期望值由同一时区的 Calendar 推导，仅校验格式模式
+        val cal = java.util.Calendar.getInstance().apply { timeInMillis = 1000L }
+        val expected = String.format(
+            java.util.Locale.US, "%04d-%02d-%02d %02d:%02d",
+            cal.get(java.util.Calendar.YEAR),
+            cal.get(java.util.Calendar.MONTH) + 1,
+            cal.get(java.util.Calendar.DAY_OF_MONTH),
+            cal.get(java.util.Calendar.HOUR_OF_DAY),
+            cal.get(java.util.Calendar.MINUTE),
+        )
+        assertEquals(expected, Formatters.dateTime(1, isSeconds = true))
     }
 }

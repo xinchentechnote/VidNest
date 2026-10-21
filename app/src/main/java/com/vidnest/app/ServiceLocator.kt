@@ -8,6 +8,7 @@ import com.vidnest.app.data.media.ScanManager
 import com.vidnest.app.data.repository.PlaybackRecordRepository
 import com.vidnest.app.data.repository.PlaybackSessionRepository
 import com.vidnest.app.data.repository.VideoRepository
+import com.vidnest.app.playback.ProgressWriter
 import kotlinx.coroutines.CoroutineScope
 
 /**
@@ -24,7 +25,13 @@ object ServiceLocator {
         private set
     lateinit var playbackSessionRepository: PlaybackSessionRepository
         private set
+    lateinit var progressWriter: ProgressWriter
+        private set
     lateinit var scanManager: ScanManager
+        private set
+
+    /** PlayerController 等需要 ApplicationContext 的组件使用 */
+    lateinit var appContext: Context
         private set
 
     @Volatile
@@ -34,10 +41,12 @@ object ServiceLocator {
         if (initialized) return
         synchronized(this) {
             if (initialized) return
+            appContext = context.applicationContext
             database = VidNestDatabase.build(context)
             videoRepository = VideoRepository(database.videoDao())
             playbackRecordRepository = PlaybackRecordRepository(database, database.playbackRecordDao())
             playbackSessionRepository = PlaybackSessionRepository(database, database.playbackSessionDao())
+            progressWriter = ProgressWriter(database, playbackRecordRepository, playbackSessionRepository)
             val scanner = DeviceVideoScanner(
                 db = database,
                 videoDao = database.videoDao(),

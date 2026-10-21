@@ -34,6 +34,7 @@ import com.vidnest.app.ui.components.VideoListItem
 fun FolderScreen(
     folderPath: String,
     onBack: () -> Unit,
+    onVideoClick: (Long) -> Unit = {},
 ) {
     val viewModel: FolderViewModel = viewModel(
         key = folderPath,
@@ -79,7 +80,7 @@ fun FolderScreen(
             } else {
                 LazyColumn {
                     items(state.videos, key = { it.id }) { video ->
-                        VideoListItem(video = video)
+                        VideoListItem(video = video, onClick = { onVideoClick(video.id) })
                     }
                 }
             }

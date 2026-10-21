@@ -36,13 +36,14 @@ MissingType 兼容问题，已按官方文档退回独立 KGP + 旧版 DSL；@En
 - [x] 库首页（扫描进度横幅/摘要/错误、文件夹网格、全部视频入口）/ 文件夹页（排序菜单）/ 全部视频页（防抖搜索 + 状态筛选）
 - [x] 扫描合并与 DAO 测试（ScannerMergeTest 6 项 + MediaStoreRowMappingTest 5 项）
 
-## 阶段 4：播放器与逐视频断点 — ⬜
+## 阶段 4：播放器与逐视频断点 — ✅
 
-- [ ] PlayerController（ExoPlayer 封装、状态 Flow、错误处理、IO 错误标记 MISSING）
-- [ ] 播放器 UI：播放/暂停、进度条 seek、快进快退、时间显示、倍速面板、错误重试、加载态、沉浸式、横竖屏
-- [ ] ProgressWriter 串行写入器（防乱序/串号）
-- [ ] PlaybackCoordinator：断点保存时机全覆盖 + 恢复 + 校验 + ENDED 规则
-- [ ] ProgressWriter 并发串号测试
+- [x] PlayerController（ExoPlayer 封装、状态 Flow、500ms tick + seek 防护媒体增量、错误处理、IO 错误标记 MISSING）
+- [x] 播放器 UI：播放/暂停、进度条 seek、快进快退 10s、时间显示、9 档倍速面板、错误重试、加载态、沉浸式 + 常亮、断点恢复提示（≥15s）、视频不可访问态
+- [x] ProgressWriter 串行写入器（limitedParallelism(1)，快照请求，与调用方生命周期解耦）
+- [x] PlaybackCoordinator：5s 周期保存、暂停/切换/退出/错误立即保存、ENDED 置 completed 归零、sanitize 校验
+- [x] 断点恢复：ProgressPolicy.resolveResumePosition（completed→0、无效进度→0、时长变化校验）
+- [x] 测试：ProgressWriterTest（快速切换 ABC 串号/并发交错/同事务计数）+ PlaybackCoordinatorTest（保存时机 7 项），共 55 个本地测试通过
 
 ## 阶段 5：播放次数与观看统计 — ⬜
 

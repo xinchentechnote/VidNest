@@ -1,6 +1,7 @@
 package com.vidnest.app.ui.components
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -29,10 +30,11 @@ import com.vidnest.app.util.Formatters
  * 名称 + 时长/大小/分辨率 + 播放次数 + 观看状态。
  */
 @Composable
-fun VideoListItem(video: Video, modifier: Modifier = Modifier) {
+fun VideoListItem(video: Video, modifier: Modifier = Modifier, onClick: (() -> Unit)? = null) {
     Row(
         modifier = modifier
             .fillMaxWidth()
+            .let { if (onClick != null) it.clickable(onClick = onClick) else it }
             .padding(horizontal = 16.dp, vertical = 8.dp),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(12.dp),

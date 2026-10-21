@@ -30,7 +30,6 @@ class PlayCountFlowTest {
     private lateinit var sessionRepo: PlaybackSessionRepository
     private lateinit var writer: ProgressWriter
 
-    private val sentinelId = 999_999L
 
     @Before
     fun setUp() {
@@ -60,10 +59,6 @@ class PlayCountFlowTest {
     /** 时长 60s 视频：阈值 = 10s */
     private fun tickMs(i: Int) = i * 500L
 
-    private suspend fun awaitAllPending() {
-        writer.submitAndWait(WriteRequest.SaveProgress(sentinelId, 0, 0, null, 0))
-    }
-
     @Test
     fun `累计10秒才计数且只计一次`() = runTest {
         val coordinator = PlaybackCoordinator(recordRepo, sessionRepo, writer)
@@ -72,18 +67,18 @@ class PlayCountFlowTest {
         for (i in 1..16) {
             coordinator.onTick(600L * i, 60_000, 1f, isPlaying = true, mediaDeltaMs = 600, nowMs = tickMs(i))
         }
-        awaitAllPending()
+        writer.awaitIdle()
         assertEquals(0, recordRepo.get(1)!!.playCount)
         for (i in 17..24) {
             coordinator.onTick(600L * i, 60_000, 1f, isPlaying = true, mediaDeltaMs = 600, nowMs = tickMs(i))
         }
-        awaitAllPending()
+        writer.awaitIdle()
         assertEquals(1, recordRepo.get(1)!!.playCount)
         // 继续播放也不再计数
         for (i in 25..30) {
             coordinator.onTick(600L * i, 60_000, 1f, isPlaying = true, mediaDeltaMs = 600, nowMs = tickMs(i))
         }
-        awaitAllPending()
+        writer.awaitIdle()
         assertEquals(1, recordRepo.get(1)!!.playCount)
     }
 
@@ -98,7 +93,7 @@ class PlayCountFlowTest {
         // seek 跳变：controller 给出的 delta 为 0
         coordinator.onTick(30_000, 60_000, 1f, isPlaying = true, mediaDeltaMs = 0, nowMs = 20_000)
         coordinator.onPause(nowMs = 21_000)
-        awaitAllPending()
+        writer.awaitIdle()
         assertEquals(0, recordRepo.get(1)!!.playCount)
     }
 
@@ -110,7 +105,7 @@ class PlayCountFlowTest {
         for (i in 1..7) {
             coordinator.onTick(1_500L * i, 60_000, 3f, isPlaying = true, mediaDeltaMs = 1_500, nowMs = tickMs(i))
         }
-        awaitAllPending()
+        writer.awaitIdle()
         assertEquals(1, recordRepo.get(1)!!.playCount)
         assertEquals(3f, recordRepo.get(1)!!.lastPlaybackSpeed!!, 0.001f)
     }
@@ -124,7 +119,7 @@ class PlayCountFlowTest {
             first.onTick(600L * i, 60_000, 1f, true, mediaDeltaMs = 600, nowMs = tickMs(i))
         }
         first.onPause(nowMs = tickMs(14)) // flush SessionTick
-        awaitAllPending()
+        writer.awaitIdle()
         assertEquals(0, recordRepo.get(1)!!.playCount)
 
         // 进程重启：新协调器领养会话继续累计 3s → 计数一次
@@ -133,7 +128,7 @@ class PlayCountFlowTest {
         for (i in 1..6) {
             second.onTick(9_000 + 500L * i, 60_000, 1f, true, mediaDeltaMs = 500, nowMs = 100_000 + tickMs(i))
         }
-        awaitAllPending()
+        writer.awaitIdle()
         assertEquals(1, recordRepo.get(1)!!.playCount)
     }
 
@@ -143,7 +138,7 @@ class PlayCountFlowTest {
         coordinator.begin(1, resumePositionMs = 0, nowMs = 0)
         coordinator.onTick(600, 60_000, 1f, true, mediaDeltaMs = 600, nowMs = 500)
         coordinator.onError(nowMs = 600)
-        awaitAllPending()
+        writer.awaitIdle()
         assertEquals(0, recordRepo.get(1)!!.playCount)
         // 会话被放弃：新的 begin 创建全新会话（累计从 0 开始）
         val sessions = db.playbackSessionDao().let { dao ->
@@ -160,7 +155,7 @@ class PlayCountFlowTest {
             first.onTick(600L * i, 60_000, 1f, true, mediaDeltaMs = 600, nowMs = tickMs(i))
         }
         first.onEnded(nowMs = 10_000)
-        awaitAllPending()
+        writer.awaitIdle()
         assertEquals(1, recordRepo.get(1)!!.playCount)
         assertTrue(recordRepo.get(1)!!.completed)
         assertEquals(0, recordRepo.get(1)!!.positionMs)
@@ -171,7 +166,7 @@ class PlayCountFlowTest {
         for (i in 1..18) {
             second.onTick(600L * i, 60_000, 1f, true, mediaDeltaMs = 600, nowMs = 100_000 + tickMs(i))
         }
-        awaitAllPending()
+        writer.awaitIdle()
         assertEquals(2, recordRepo.get(1)!!.playCount)
     }
 
@@ -182,7 +177,7 @@ class PlayCountFlowTest {
         for (i in 1..18) {
             coordinator.onTick(600L * i, 60_000, 1f, true, mediaDeltaMs = 600, nowMs = tickMs(i))
         }
-        awaitAllPending()
+        writer.awaitIdle()
         val record = recordRepo.get(1)!!
         assertEquals(1, record.playCount)
         // 计数发生时（tick17，累计 10.2s）同步保存了断点；tick18 未到保存周期

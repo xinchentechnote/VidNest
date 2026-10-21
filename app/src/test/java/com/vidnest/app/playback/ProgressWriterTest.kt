@@ -29,8 +29,6 @@ class ProgressWriterTest {
     private lateinit var db: VidNestDatabase
     private lateinit var writer: ProgressWriter
 
-    /** 哨兵视频 id：不影响真实断言目标 */
-    private val sentinelId = 999_999L
 
     @Before
     fun setUp() {
@@ -52,10 +50,6 @@ class ProgressWriterTest {
         db.close()
     }
 
-    private suspend fun awaitAllPending() {
-        writer.submitAndWait(WriteRequest.SaveProgress(sentinelId, 0, 0, null, 0))
-    }
-
     @Test
     fun `快速切换ABC各自位置正确不串号`() = runTest {
         // 模拟快速连续切换：A、B、C 交错提交
@@ -66,7 +60,7 @@ class ProgressWriterTest {
         writer.submit(save(2, 21_000))
         writer.submit(save(3, 31_000))
         writer.submit(save(1, 12_000))
-        awaitAllPending()
+        writer.awaitIdle()
 
         assertEquals(12_000, record(1)!!.positionMs)
         assertEquals(21_000, record(2)!!.positionMs)
@@ -76,7 +70,7 @@ class ProgressWriterTest {
     @Test
     fun `同视频多次提交最终值是最后一次`() = runTest {
         repeat(50) { writer.submit(save(1, it.toLong() * 1000)) }
-        awaitAllPending()
+        writer.awaitIdle()
         assertEquals(49_000, record(1)!!.positionMs)
     }
 
@@ -89,8 +83,8 @@ class ProgressWriterTest {
                 add(save(3, (i + 200).toLong() * 1000))
             }
         }
-        requests.map { req -> async { writer.submitAndWait(req) } }.awaitAll()
-        awaitAllPending()
+        requests.forEach { writer.submit(it) }
+        writer.awaitIdle()
 
         assertEquals(29_000, record(1)!!.positionMs)
         assertEquals(129_000, record(2)!!.positionMs)
@@ -104,12 +98,13 @@ class ProgressWriterTest {
         // 会话
         val sessionId = "sess-1"
         db.playbackSessionDao().upsert(session(sessionId, videoId = 1))
-        writer.submitAndWait(
+        writer.submit(
             WriteRequest.CountReached(
                 videoId = 1, positionMs = 8_000, durationMs = 60_000,
                 speed = 1.5f, sessionId = sessionId, nowMs = 100,
             ),
         )
+        writer.awaitIdle()
         val record = record(1)!!
         assertEquals(1, record.playCount)
         assertEquals(8_000, record.positionMs)
@@ -121,8 +116,9 @@ class ProgressWriterTest {
     fun `播放结束标记已看完且断点归零`() = runTest {
         db.videoDao().upsertAll(listOf(videoRow(1)))
         writer.submit(save(1, 50_000))
-        awaitAllPending()
-        writer.submitAndWait(WriteRequest.MarkCompleted(1, 2.0f, nowMs = 200))
+        writer.awaitIdle()
+        writer.submit(WriteRequest.MarkCompleted(1, 2.0f, nowMs = 200))
+        writer.awaitIdle()
         val record = record(1)!!
         assertEquals(true, record.completed)
         assertEquals(0, record.positionMs)

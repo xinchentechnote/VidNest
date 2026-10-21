@@ -4,9 +4,11 @@ import androidx.room.withTransaction
 import com.vidnest.app.data.local.VidNestDatabase
 import com.vidnest.app.data.repository.PlaybackRecordRepository
 import com.vidnest.app.data.repository.PlaybackSessionRepository
+import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
@@ -53,7 +55,8 @@ sealed interface WriteRequest {
  * 串行数据库写入器（docs/architecture.md §4、docs/playback-and-progress.md §2.3）。
  *
  * 防串号设计：
- * 1. 所有断点/会话写请求经单一串行调度器（limitedParallelism(1)），顺序确定；
+ * 1. 写请求经单一 actor（Channel UNLIMITED + 单消费者）执行——**严格 FIFO**，
+ *    不依赖调度器的顺序假设（limitedParallelism 并不保证 FIFO，CI 已实测暴露）；
  * 2. 请求是不可变快照，不引用共享可变状态，UI 协程取消不影响落库；
  * 3. 不同 videoId 各自按主键 upsert，物理上不可能串号；
  * 4. 计数与断点在同一事务内更新。
@@ -64,17 +67,40 @@ class ProgressWriter(
     private val sessionRepository: PlaybackSessionRepository,
 ) {
 
+    private sealed interface Msg {
+        data class Work(val request: WriteRequest) : Msg
+        data class Barrier(val done: CompletableDeferred<Unit>) : Msg
+    }
+
     private val writeDispatcher = Dispatchers.IO.limitedParallelism(1)
-    private val writeScope = CoroutineScope(SupervisorJob() + writeDispatcher)
+    private val channel = Channel<Msg>(Channel.UNLIMITED)
+    private val actorScope = CoroutineScope(SupervisorJob() + writeDispatcher)
+
+    init {
+        actorScope.launch {
+            for (msg in channel) {
+                when (msg) {
+                    is Msg.Work -> execute(msg.request)
+                    is Msg.Barrier -> msg.done.complete(Unit)
+                }
+            }
+        }
+    }
 
     /** 异步提交：立即返回，写入按提交顺序串行执行 */
     fun submit(request: WriteRequest) {
-        writeScope.launch { execute(request) }
+        channel.trySend(Msg.Work(request))
     }
 
-    /** 同步等待写入完成（测试与关键路径使用） */
-    suspend fun submitAndWait(request: WriteRequest) =
-        withContext(writeDispatcher) { execute(request) }
+    /**
+     * 等待队列中所有已提交请求执行完成（屏障消息在 actor 中排在既有请求之后）。
+     * 测试与关键路径使用。
+     */
+    suspend fun awaitIdle() {
+        val barrier = CompletableDeferred<Unit>()
+        channel.send(Msg.Barrier(barrier))
+        barrier.await()
+    }
 
     private suspend fun execute(request: WriteRequest) {
         try {

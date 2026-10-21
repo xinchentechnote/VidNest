@@ -29,7 +29,6 @@ class PlaybackCoordinatorTest {
     private lateinit var writer: ProgressWriter
     private lateinit var coordinator: PlaybackCoordinator
 
-    private val sentinelId = 999_999L
 
     @Before
     fun setUp() {
@@ -67,20 +66,16 @@ class PlaybackCoordinatorTest {
         lastScannedAt = 1,
     )
 
-    private suspend fun awaitAllPending() {
-        writer.submitAndWait(WriteRequest.SaveProgress(sentinelId, 0, 0, null, 0))
-    }
-
     @Test
     fun `播放中每5秒保存一次`() = runTest {
         coordinator.begin(1, resumePositionMs = 0, nowMs = 0)
         // 4.9s 内的 tick 不触发保存
         coordinator.onTick(positionMs = 4_000, durationMs = 60_000, speed = 1f, isPlaying = true, mediaDeltaMs = 600, nowMs = 4_900)
-        awaitAllPending()
+        writer.awaitIdle()
         assertNull(db.playbackRecordDao().get(1))
         // 5s 后的 tick 触发保存
         coordinator.onTick(positionMs = 5_200, durationMs = 60_000, speed = 1f, isPlaying = true, mediaDeltaMs = 600, nowMs = 5_200)
-        awaitAllPending()
+        writer.awaitIdle()
         assertEquals(5_200, db.playbackRecordDao().get(1)!!.positionMs)
     }
 
@@ -89,7 +84,7 @@ class PlaybackCoordinatorTest {
         coordinator.begin(1, resumePositionMs = 0, nowMs = 0)
         coordinator.onTick(2_000, 60_000, 1f, true, mediaDeltaMs = 600, nowMs = 2_000)
         coordinator.onPause(nowMs = 2_500)
-        awaitAllPending()
+        writer.awaitIdle()
         assertEquals(2_000, db.playbackRecordDao().get(1)!!.positionMs)
     }
 
@@ -97,10 +92,10 @@ class PlaybackCoordinatorTest {
     fun `暂停期间不累计保存周期`() = runTest {
         coordinator.begin(1, resumePositionMs = 0, nowMs = 0)
         coordinator.onPause(nowMs = 1_000)
-        awaitAllPending()
+        writer.awaitIdle()
         // 暂停状态下 tick（isPlaying=false）不触发保存
         coordinator.onTick(2_000, 60_000, 1f, isPlaying = false, mediaDeltaMs = 0, nowMs = 10_000)
-        awaitAllPending()
+        writer.awaitIdle()
         assertEquals(1_000, db.playbackRecordDao().get(1)!!.updatedAt)
     }
 
@@ -109,7 +104,7 @@ class PlaybackCoordinatorTest {
         coordinator.begin(1, resumePositionMs = 0, nowMs = 0)
         coordinator.onTick(58_000, 60_000, 1f, true, mediaDeltaMs = 600, nowMs = 1_000)
         coordinator.onEnded(nowMs = 1_500)
-        awaitAllPending()
+        writer.awaitIdle()
         val record = db.playbackRecordDao().get(1)!!
         assertEquals(true, record.completed)
         assertEquals(0, record.positionMs)
@@ -119,7 +114,7 @@ class PlaybackCoordinatorTest {
     fun `保存位置超出时长被截断`() = runTest {
         coordinator.begin(1, resumePositionMs = 0, nowMs = 0)
         coordinator.onTick(70_000, 60_000, 1f, true, mediaDeltaMs = 600, nowMs = 5_000)
-        awaitAllPending()
+        writer.awaitIdle()
         assertEquals(60_000, db.playbackRecordDao().get(1)!!.positionMs)
     }
 
@@ -128,12 +123,12 @@ class PlaybackCoordinatorTest {
         coordinator.begin(1, resumePositionMs = 0, nowMs = 0)
         coordinator.onTick(3_000, 60_000, 1f, true, mediaDeltaMs = 600, nowMs = 3_000)
         coordinator.onSwitchAway(nowMs = 3_100)
-        awaitAllPending()
+        writer.awaitIdle()
         assertEquals(3_000, db.playbackRecordDao().get(1)!!.positionMs)
         // 新视频会话重新开始
         coordinator.begin(2, resumePositionMs = 0, nowMs = 4_000)
         coordinator.onTick(500, 60_000, 1f, true, mediaDeltaMs = 600, nowMs = 5_000)
-        awaitAllPending()
+        writer.awaitIdle()
         assertNull(db.playbackRecordDao().get(2))
     }
 
@@ -141,7 +136,7 @@ class PlaybackCoordinatorTest {
     fun `未知时长时sanitize不截断`() = runTest {
         coordinator.begin(1, resumePositionMs = 0, nowMs = 0)
         coordinator.onTick(30_000, 0, 1f, true, mediaDeltaMs = 600, nowMs = 5_000)
-        awaitAllPending()
+        writer.awaitIdle()
         assertNotNull(db.playbackRecordDao().get(1))
         assertEquals(30_000, db.playbackRecordDao().get(1)!!.positionMs)
     }

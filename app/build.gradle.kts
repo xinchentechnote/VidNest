@@ -1,3 +1,5 @@
+import org.jetbrains.kotlin.gradle.dsl.JvmTarget
+
 plugins {
     alias(libs.plugins.android.application)
     id("org.jetbrains.kotlin.android")
@@ -67,6 +69,15 @@ android {
 
 ksp {
     arg("room.schemaLocation", "$projectDir/schemas")
+}
+
+// 固定 Kotlin JVM target 与 compileOptions(17) 一致：
+// 否则跟随 Gradle JDK 浮动，在 Android Studio（JBR 21）下会出现
+// Inconsistent JVM Target Compatibility（compileDebugJavaWithJavac 17 vs compileDebugKotlin 21）
+kotlin {
+    compilerOptions {
+        jvmTarget.set(JvmTarget.JVM_17)
+    }
 }
 
 dependencies {

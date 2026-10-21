@@ -69,15 +69,26 @@ interface VideoDao {
     @Query("SELECT * FROM videos WHERE availabilityStatus = ${VideoEntity.STATUS_MISSING}")
     suspend fun getMissing(): List<VideoEntity>
 
-    /** 文件夹聚合：目录 + 数量 + 总大小 + 最近播放时间 */
+    /** 根目录层级聚合：按路径第一段分组，数量/大小含全部子目录（层级浏览入口） */
     @Query(
-        "SELECT v.relativePath AS relativePath, COUNT(*) AS videoCount, " +
-            "SUM(v.sizeBytes) AS totalBytes, MAX(r.lastPlayedAt) AS lastPlayedAt " +
+        "SELECT substr(v.relativePath, 1, instr(v.relativePath || '/', '/') - 1) AS segment, " +
+            "COUNT(*) AS videoCount, SUM(v.sizeBytes) AS totalBytes, MAX(r.lastPlayedAt) AS lastPlayedAt " +
             "FROM videos v LEFT JOIN playback_records r ON r.videoId = v.id " +
             "WHERE v.availabilityStatus = ${VideoEntity.STATUS_AVAILABLE} " +
-            "GROUP BY v.relativePath",
+            "GROUP BY segment"
     )
-    fun observeFolderRows(): Flow<List<FolderRow>>
+    fun observeRootFolderRows(): Flow<List<FolderSegmentRow>>
+
+    /** 子目录层级聚合：path 的直接子目录段，数量含其全部子目录 */
+    @Query(
+        "SELECT substr(v.relativePath, :pathLen + 2, instr(substr(v.relativePath, :pathLen + 2) || '/', '/') - 1) AS segment, " +
+            "COUNT(*) AS videoCount, SUM(v.sizeBytes) AS totalBytes, MAX(r.lastPlayedAt) AS lastPlayedAt " +
+            "FROM videos v LEFT JOIN playback_records r ON r.videoId = v.id " +
+            "WHERE v.availabilityStatus = ${VideoEntity.STATUS_AVAILABLE} " +
+            "AND v.relativePath != :path AND v.relativePath LIKE :path || '/%' " +
+            "GROUP BY segment"
+    )
+    fun observeChildFolderRows(path: String, pathLen: Int): Flow<List<FolderSegmentRow>>
 
     /** 搜索/排序/目录过滤统一走 RawQuery（见 VideoRepository 组装），两张表变化都会触发重发 */
     @RawQuery(observedEntities = [VideoEntity::class])

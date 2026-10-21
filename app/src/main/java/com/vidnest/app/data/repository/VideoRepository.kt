@@ -1,7 +1,7 @@
 package com.vidnest.app.data.repository
 
 import androidx.sqlite.db.SimpleSQLiteQuery
-import com.vidnest.app.data.local.FolderRow
+import com.vidnest.app.data.local.FolderSegmentRow
 import com.vidnest.app.data.local.VideoDao
 import com.vidnest.app.data.local.VideoEntity
 import com.vidnest.app.data.local.PlaybackRecordEntity
@@ -27,8 +27,13 @@ class VideoRepository(
     private val ioDispatcher: CoroutineDispatcher = Dispatchers.IO,
 ) {
 
-    fun observeFolders(): Flow<List<FolderInfo>> =
-        videoDao.observeFolderRows().map { rows -> rows.map { it.toDomain() } }
+    /** 根目录层级：库首页展示（如 DCIM / Movies / Download），计数含全部子目录 */
+    fun observeRootFolders(): Flow<List<FolderInfo>> =
+        videoDao.observeRootFolderRows().map { rows -> rows.map { it.toDomain(null) } }
+
+    /** 子目录层级：文件夹页展示当前目录下的直接子目录 */
+    fun observeChildFolders(path: String): Flow<List<FolderInfo>> =
+        videoDao.observeChildFolderRows(path, path.length).map { rows -> rows.map { it.toDomain(path) } }
 
     fun observeFolderVideos(path: String, sort: VideoSortField): Flow<List<Video>> =
         videoDao.observeVideoRows(buildQuery(sort, folderPath = path)).map { it.toDomainList() }
@@ -70,13 +75,16 @@ class VideoRepository(
 
     suspend fun getMissing(): List<VideoEntity> = withContext(ioDispatcher) { videoDao.getMissing() }
 
-    private fun FolderRow.toDomain() = FolderInfo(
-        path = relativePath,
-        displayName = folderDisplayName(relativePath),
-        videoCount = videoCount,
-        totalBytes = totalBytes ?: 0L,
-        lastPlayedAtMs = lastPlayedAt,
-    )
+    private fun FolderSegmentRow.toDomain(parentPath: String?): FolderInfo {
+        val fullPath = parentPath?.let { "$it/$segment" } ?: segment
+        return FolderInfo(
+            path = fullPath,
+            displayName = segment,
+            videoCount = videoCount,
+            totalBytes = totalBytes ?: 0L,
+            lastPlayedAtMs = lastPlayedAt,
+        )
+    }
 
     private fun List<VideoWithRecordRow>.toDomainList(): List<Video> =
         map { row -> row.video.toDomain(row.record?.toRecordEntity()) }

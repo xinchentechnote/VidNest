@@ -102,7 +102,8 @@ class ScanManager(
         observerJob = appScope.launch {
             delay(DEBOUNCE_MS)
             if (MediaPermissions.isGranted(context)) {
-                startScan(auto = false)
+                // 经前台服务执行：应用已在后台时扫描也能继续（后台受限时回退进程内）
+                ScanService.start(context, auto = false)
             }
         }
     }

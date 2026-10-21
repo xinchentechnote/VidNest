@@ -8,6 +8,7 @@ import kotlinx.coroutines.test.runTest
 import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNotNull
+import org.junit.Assert.assertTrue
 import org.junit.Assert.assertNull
 import org.junit.Before
 import org.junit.Test
@@ -97,10 +98,11 @@ class VideoDaoTest {
     }
 
     @Test
-    fun `文件夹聚合包含数量大小与最近播放`() = runTest {
+    fun `根目录层级聚合包含子目录的数量与大小`() = runTest {
         val v1 = video(uri = "content://media/1", path = "Movies", name = "a.mp4", size = 100)
-        val v2 = video(uri = "content://media/2", path = "Movies", name = "b.mp4", size = 300)
-        videoDao.upsertAll(listOf(v1, v2))
+        val v2 = video(uri = "content://media/2", path = "Movies/sub", name = "b.mp4", size = 300)
+        val v3 = video(uri = "content://media/3", path = "DCIM/Camera", name = "c.mp4", size = 50)
+        videoDao.upsertAll(listOf(v1, v2, v3))
         val id1 = videoDao.getByUri("content://media/1")!!.id
         recordDao.upsert(
             PlaybackRecordEntity(
@@ -108,13 +110,29 @@ class VideoDaoTest {
                 lastPlayedAt = 555, completed = false, lastPlaybackSpeed = null, updatedAt = 555,
             ),
         )
-        val folders = videoDao.observeFolderRows().first()
-        assertEquals(1, folders.size)
-        val movies = folders.first()
-        assertEquals("Movies", movies.relativePath)
+        // 根目录：Movies 与 DCIM，计数含子目录
+        val roots = videoDao.observeRootFolderRows().first()
+        assertEquals(2, roots.size)
+        val movies = roots.first { it.segment == "Movies" }
         assertEquals(2, movies.videoCount)
         assertEquals(400L, movies.totalBytes)
         assertEquals(555L, movies.lastPlayedAt)
+        assertEquals(1, roots.first { it.segment == "DCIM" }.videoCount)
+
+        // 子目录：Movies 下的直接子目录段
+        val children = videoDao.observeChildFolderRows("Movies", "Movies".length).first()
+        assertEquals(1, children.size)
+        assertEquals("sub", children.first().segment)
+        assertEquals(1, children.first().videoCount)
+        // DCIM 下的子目录
+        assertEquals("Camera", videoDao.observeChildFolderRows("DCIM", "DCIM".length).first().first().segment)
+    }
+
+    @Test
+    fun `根目录无子目录时子目录查询为空`() = runTest {
+        videoDao.upsertAll(listOf(video(uri = "content://media/1", path = "Movies", name = "a.mp4")))
+        val children = videoDao.observeChildFolderRows("Movies", "Movies".length).first()
+        assertTrue(children.isEmpty())
     }
 
     @Test
@@ -130,7 +148,7 @@ class VideoDaoTest {
         )
         videoDao.markMissingByScanBatch(scanBatch = 200, volumeNames = listOf("external_primary"))
         assertEquals(VideoEntity.STATUS_MISSING, videoDao.getById(id)!!.availabilityStatus)
-        assertEquals(0, videoDao.observeFolderRows().first().size)
+        assertEquals(0, videoDao.observeRootFolderRows().first().size)
         // 记录仍在
         assertNotNull(recordDao.get(id))
     }

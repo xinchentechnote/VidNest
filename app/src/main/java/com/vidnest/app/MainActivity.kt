@@ -60,6 +60,9 @@ class MainActivity : ComponentActivity() {
                                 onVideoInfoClick = { videoId ->
                                     navController.navigate(Routes.detail(videoId))
                                 },
+                                onSubFolderClick = { subPath ->
+                                    navController.navigate(Routes.folder(subPath))
+                                },
                             )
                         }
                         composable(Routes.SETTINGS) {

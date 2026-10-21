@@ -19,6 +19,10 @@ object Formatters {
         }
     }
 
+    /** 列表元信息用：未知/零时长显示 --:-- */
+    fun durationOrUnknown(totalMs: Long): String =
+        if (totalMs > 0) duration(totalMs) else "--:--"
+
     /** 1.2 GB / 345 MB / 56 KB / 512 B */
     fun fileSize(bytes: Long): String {
         if (bytes < 0) return "--"

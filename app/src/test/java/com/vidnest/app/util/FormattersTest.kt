@@ -20,6 +20,13 @@ class FormattersTest {
     }
 
     @Test
+    fun `未知时长显示占位`() {
+        assertEquals("--:--", Formatters.durationOrUnknown(0))
+        assertEquals("--:--", Formatters.durationOrUnknown(-1))
+        assertEquals("12:30", Formatters.durationOrUnknown(750_000))
+    }
+
+    @Test
     fun `文件大小格式化`() {
         assertEquals("512 B", Formatters.fileSize(512))
         assertEquals("56 KB", Formatters.fileSize(56 * 1024L))

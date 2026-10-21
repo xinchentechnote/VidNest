@@ -47,9 +47,9 @@ enum class Availability {
     MISSING,
 }
 
-/** 文件夹聚合行（视频数量 + 总大小 + 最近播放时间） */
-data class FolderRow(
-    @ColumnInfo(name = "relativePath") val relativePath: String,
+/** 层级浏览的目录段聚合行（按路径某一段分组，计数含其全部子目录） */
+data class FolderSegmentRow(
+    @ColumnInfo(name = "segment") val segment: String,
     @ColumnInfo(name = "videoCount") val videoCount: Int,
     @ColumnInfo(name = "totalBytes") val totalBytes: Long?,
     @ColumnInfo(name = "lastPlayedAt") val lastPlayedAt: Long?,

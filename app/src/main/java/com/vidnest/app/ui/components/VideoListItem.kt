@@ -12,8 +12,8 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.PlayArrow
-import androidx.compose.material.icons.outlined.Info
 import androidx.compose.material.icons.filled.PlayCircle
+import androidx.compose.material.icons.outlined.Info
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
@@ -27,8 +27,8 @@ import com.vidnest.app.domain.model.WatchStatus
 import com.vidnest.app.util.Formatters
 
 /**
- * 视频列表项（文件夹页/全部视频页共用）：
- * 名称 + 时长/大小/分辨率 + 播放次数 + 观看状态。
+ * 视频列表项（文件夹页/全部视频页共用）。
+ * 明确展示：时长、大小、分辨率 + 已播放次数 + 观看状态。
  */
 @Composable
 fun VideoListItem(
@@ -59,19 +59,6 @@ fun VideoListItem(
                 contentDescription = null,
                 tint = MaterialTheme.colorScheme.onSurfaceVariant,
             )
-            Text(
-                text = Formatters.duration(video.durationMs),
-                style = MaterialTheme.typography.labelSmall,
-                color = MaterialTheme.colorScheme.onSurface,
-                modifier = Modifier
-                    .align(Alignment.BottomEnd)
-                    .padding(4.dp)
-                    .background(
-                        MaterialTheme.colorScheme.scrim.copy(alpha = 0.6f),
-                        RoundedCornerShape(4.dp),
-                    )
-                    .padding(horizontal = 4.dp, vertical = 1.dp),
-            )
         }
         Column(modifier = Modifier.weight(1f)) {
             Text(
@@ -80,8 +67,10 @@ fun VideoListItem(
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
             )
+            // 元信息：时长 · 大小 · 分辨率
             val resolution = Formatters.resolution(video.width, video.height)
             val meta = listOfNotNull(
+                Formatters.durationOrUnknown(video.durationMs),
                 Formatters.fileSize(video.sizeBytes),
                 resolution.takeIf { it.isNotEmpty() },
             ).joinToString(" · ")
@@ -90,22 +79,31 @@ fun VideoListItem(
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
+            // 统计行：状态 · 已播放次数 · 上次位置
+            Row(
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
                 WatchStatusChip(video)
-                if (video.playback != null && video.playback.playCount > 0) {
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        Icon(
-                            imageVector = Icons.Filled.PlayArrow,
-                            contentDescription = null,
-                            modifier = Modifier.size(14.dp),
-                            tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                        )
-                        Text(
-                            text = "${video.playback.playCount}",
-                            style = MaterialTheme.typography.labelSmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        )
-                    }
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Icon(
+                        imageVector = Icons.Filled.PlayArrow,
+                        contentDescription = null,
+                        modifier = Modifier.size(14.dp),
+                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                    Text(
+                        text = "已播放 ${video.playback?.playCount ?: 0} 次",
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+                if (video.watchStatus == WatchStatus.WATCHING && video.playback != null) {
+                    Text(
+                        text = "上次 ${Formatters.duration(video.playback.positionMs)}",
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
                 }
                 if (onInfoClick != null) {
                     Row(
@@ -124,13 +122,6 @@ fun VideoListItem(
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                         )
                     }
-                }
-                if (video.watchStatus == WatchStatus.WATCHING && video.playback != null) {
-                    Text(
-                        text = "上次 ${Formatters.duration(video.playback.positionMs)}",
-                        style = MaterialTheme.typography.labelSmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
                 }
             }
         }

@@ -76,8 +76,9 @@ class DeviceSmokeTest {
         assertEquals(30_000, record!!.positionMs)
         assertEquals(2, record.playCount)
 
-        // 文件夹聚合在真实 SQLite 上工作
-        val folders = db.videoDao().observeFolderRows()
-        assertEquals("DCIM/Camera", folders.first().first().relativePath)
+        // 根目录层级聚合在真实 SQLite 上工作
+        val roots = db.videoDao().observeRootFolderRows().first()
+        assertEquals("DCIM", roots.first().segment)
+        assertEquals(1, roots.first().videoCount)
     }
 }

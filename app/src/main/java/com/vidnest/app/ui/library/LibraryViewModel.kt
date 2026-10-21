@@ -2,7 +2,9 @@ package com.vidnest.app.ui.library
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.vidnest.app.ServiceLocator
 import com.vidnest.app.data.media.ScanManager
+import com.vidnest.app.data.media.ScanService
 import com.vidnest.app.data.repository.VideoRepository
 import com.vidnest.app.domain.model.FolderInfo
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -31,7 +33,7 @@ class LibraryViewModel(
     private val permissionGranted = MutableStateFlow<Boolean?>(null)
 
     val uiState: StateFlow<LibraryUiState> = combine(
-        videoRepository.observeFolders(),
+        videoRepository.observeRootFolders(),
         videoRepository.observeAvailableCount(),
         scanManager.state,
         permissionGranted,
@@ -75,9 +77,9 @@ class LibraryViewModel(
         val firstResolution = permissionGranted.value == null
         permissionGranted.value = granted
         if (granted && firstResolution) {
-            scanManager.startScan(auto = true)
+            ScanService.start(ServiceLocator.appContext, auto = true)
         }
     }
 
-    fun rescan() = scanManager.startScan(auto = false)
+    fun rescan() = ScanService.start(ServiceLocator.appContext, auto = false)
 }

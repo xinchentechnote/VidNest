@@ -1,0 +1,103 @@
+name: Release
+
+on:
+  push:
+    tags: ['v*']
+  workflow_dispatch:
+    inputs:
+      tag_name:
+        description: '发布标签（留空则自动使用 versionName 生成 vX.Y.Z）'
+        required: false
+        default: ''
+
+permissions:
+  contents: write
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  release:
+    name: 测试、签名打包并发布
+    runs-on: ubuntu-latest
+    steps:
+      - name: 检出代码
+        uses: actions/checkout@v4
+
+      - name: 配置 JDK 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: 配置 Gradle 缓存
+        uses: gradle/actions/setup-gradle@v4
+
+      - name: 配置 Android SDK（Platform 37）
+        run: |
+          yes | "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" --licenses > /dev/null || true
+          "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" "platforms;android-37" > /dev/null
+
+      - name: 还原签名密钥
+        env:
+          VIDNEST_KEYSTORE_BASE64: ${{ secrets.VIDNEST_KEYSTORE_BASE64 }}
+        run: |
+          echo "$VIDNEST_KEYSTORE_BASE64" | base64 --decode > "$GITHUB_WORKSPACE/vidnest-release.jks"
+          echo "VIDNEST_KEYSTORE_FILE=vidnest-release.jks" >> "$GITHUB_ENV"
+
+      - name: 单元测试
+        run: ./gradlew testDebugUnitTest --stacktrace
+
+      - name: 构建 Debug 与签名 Release APK
+        env:
+          VIDNEST_KEYSTORE_PASSWORD: ${{ secrets.VIDNEST_KEYSTORE_PASSWORD }}
+          VIDNEST_KEY_ALIAS: ${{ secrets.VIDNEST_KEY_ALIAS }}
+          VIDNEST_KEY_PASSWORD: ${{ secrets.VIDNEST_KEY_PASSWORD }}
+        run: |
+          ./gradlew assembleDebug assembleRelease --stacktrace
+          "$ANDROID_HOME/build-tools/37.0.0/apksigner" verify --print-certs app/build/outputs/apk/release/app-release.apk
+
+      - name: 计算版本与发布标签
+        id: meta
+        env:
+          INPUT_TAG: ${{ github.event.inputs.tag_name }}
+        run: |
+          VERSION=$(grep -o 'versionName = "[^"]*"' app/build.gradle.kts | cut -d'"' -f2)
+          if [ -n "$INPUT_TAG" ]; then
+            TAG="$INPUT_TAG"
+          elif [ "$GITHUB_REF_TYPE" = "tag" ]; then
+            TAG="$GITHUB_REF_NAME"
+          else
+            TAG="v$VERSION"
+          fi
+          cp app/build/outputs/apk/release/app-release.apk "VidNest-${TAG}-release.apk"
+          cp app/build/outputs/apk/debug/app-debug.apk "VidNest-${TAG}-debug.apk"
+          echo "TAG=$TAG" >> "$GITHUB_ENV"
+          echo "VERSION=$VERSION" >> "$GITHUB_ENV"
+          ls -la VidNest-*.apk
+
+      - name: 创建 GitHub Release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release create "$TAG" \
+            --target "$GITHUB_SHA" \
+            --title "VidNest $TAG" \
+            --notes "自动构建发布。
+
+          ## 安装
+          - **VidNest-${TAG}-release.apk**：正式签名版（推荐，可增量更新）
+          - VidNest-${TAG}-debug.apk：调试版
+
+          minSdk 24（Android 7.0+）。离线应用，仅需媒体读取权限。
+          完整功能说明见 README.md。" \
+            "VidNest-${TAG}-release.apk" "VidNest-${TAG}-debug.apk"
+
+      - name: 上传测试报告（失败时）
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: release-test-reports
+          path: app/build/reports/
+          if-no-files-found: ignore

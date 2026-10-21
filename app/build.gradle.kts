@@ -22,6 +22,19 @@ android {
         }
     }
 
+    // 发布签名：仅当通过环境变量提供密钥时启用（CI/本地打包均可，无密钥时构建未签名 APK）
+    signingConfigs {
+        create("release") {
+            val keystorePath = System.getenv("VIDNEST_KEYSTORE_FILE")
+            if (keystorePath != null) {
+                storeFile = rootProject.file(keystorePath)
+                storePassword = System.getenv("VIDNEST_KEYSTORE_PASSWORD")
+                keyAlias = System.getenv("VIDNEST_KEY_ALIAS")
+                keyPassword = System.getenv("VIDNEST_KEY_PASSWORD")
+            }
+        }
+    }
+
     buildTypes {
         release {
             isMinifyEnabled = false
@@ -29,6 +42,9 @@ android {
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro"
             )
+            if (System.getenv("VIDNEST_KEYSTORE_FILE") != null) {
+                signingConfig = signingConfigs.getByName("release")
+            }
         }
     }
     compileOptions {

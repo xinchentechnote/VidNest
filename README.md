@@ -47,9 +47,22 @@ Kotlin · Jetpack Compose + Material 3 · Media3 ExoPlayer 1.11.1 · Room 2.8.5 
 
 Android Studio 直接打开项目根目录即可运行。
 
-### 签名（如需发布）
+### CI / 发布（GitHub Actions）
 
-项目未内置签名配置。可在 `app/build.gradle.kts` 的 `buildTypes.release` 添加 `signingConfig`，或用 `apksigner` 对未签名 APK 手工签名。
+- **CI**（`.github/workflows/ci.yml`）：push 到 main 或 PR 时自动运行单元测试 + lint + 构建 Debug APK（Artifact 可下载）。
+- **Release**（`.github/workflows/release.yml`）：推送 `v*` 标签或在 Actions 页手动触发 → 运行测试 → 构建签名 Release APK + Debug APK → 自动创建 GitHub Release 并附上 APK。
+
+```bash
+# 打补丁版本发布
+git tag v1.0.1
+git push origin v1.0.1
+
+# 或：GitHub 仓库页 → Actions → Release → Run workflow
+```
+
+签名配置：CI 使用仓库 Secrets 中的密钥（`VIDNEST_KEYSTORE_BASE64/PASSWORD/ALIAS/KEY_PASSWORD`），签名配置在 `app/build.gradle.kts` 中由环境变量驱动——本地无密钥时构建未签名 APK，设置环境变量 `VIDNEST_KEYSTORE_FILE/PASSWORD/ALIAS/KEY_PASSWORD` 即可本地出签名包。
+
+> 私有仓库的 Actions 消耗免费额度分钟数（免费版 2000 分钟/月，本项目单次 CI 约 5-8 分钟）。
 
 ## 自动化测试
 

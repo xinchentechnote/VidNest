@@ -31,8 +31,11 @@ jobs:
           distribution: temurin
           java-version: '17'
 
-      - name: 配置 Gradle 缓存
+      # 私有仓库免费 Actions 存储配额仅 500MB，Gradle 依赖缓存放不下，禁用缓存避免配额爆炸
+      - name: 配置 Gradle（禁用缓存）
         uses: gradle/actions/setup-gradle@v4
+        with:
+          cache-disabled: true
 
       - name: 配置 Android SDK（Platform 37）
         run: |
@@ -104,3 +107,5 @@ jobs:
           name: release-test-reports
           path: app/build/reports/
           if-no-files-found: ignore
+          retention-days: 3
+        continue-on-error: true

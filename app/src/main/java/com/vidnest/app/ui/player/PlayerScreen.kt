@@ -184,7 +184,6 @@ private fun PlayerContent(
             factory = { ctx ->
                 PlayerView(ctx).apply {
                     useController = false
-                    setShutterBackgroundColor(android.graphics.Color.BLACK)
                 }
             },
             update = { view -> view.player = viewModel.controller.player },

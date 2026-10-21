@@ -67,10 +67,13 @@ MissingType 兼容问题，已按官方文档退回独立 KGP + 旧版 DSL；@En
 - [x] 启动时会话清理（counted + 过期未计数）
 - [x] 全部页面加载/空/错误/权限态；中文文案；Material 3 动态取色主题
 
-## 阶段 7：验证与交付 — ⬜
+## 阶段 7：验证与交付 — ✅
 
-- [ ] testDebugUnitTest 全部通过
-- [ ] assembleDebug 成功；评估 release 构建（无签名密钥时如实说明）
-- [ ] androidTest 编译（设备测试需真机，步骤入 README）
-- [ ] README.md（构建、安装、功能清单、设备测试步骤、已知限制）
-- [ ] 权限清单核查（仅媒体读权限，无多余权限）
+- [x] testDebugUnitTest 全部通过（69 个测试）
+- [x] assembleDebug 成功（app-debug.apk 23.9MB）；assembleRelease 构建成功但为未签名 APK（无签名密钥，如实说明）
+- [x] assembleDebugAndroidTest 编译通过；connectedDebugAndroidTest 在 API 36 模拟器执行通过
+- [x] lintDebug：0 错误，29 个警告（不阻塞）
+- [x] 端到端真机冒烟（API 36 模拟器）：安装 → 授权 → 推送真实 MP4 → 扫描归类 Movies/ →
+      文件夹页展示 → 播放器播放（ExoPlayer 初始化、解码器工作、无错误）→ 退出返回文件夹，全程无崩溃
+- [x] README.md（构建、安装、签名说明、功能清单、测试、真机步骤、已知限制）
+- [x] 权限清单核查：仅 READ_MEDIA_VIDEO + READ_EXTERNAL_STORAGE(maxSdk=32)

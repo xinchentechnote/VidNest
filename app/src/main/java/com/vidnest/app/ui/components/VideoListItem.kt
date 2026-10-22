@@ -47,15 +47,15 @@ fun FolderRowItem(
         modifier = modifier
             .fillMaxWidth()
             .let { if (onClick != null) it.clickable(onClick = onClick) else it }
-            .padding(horizontal = 16.dp, vertical = 5.dp),
+            .padding(horizontal = 16.dp, vertical = 9.dp),
         verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(10.dp),
+        horizontalArrangement = Arrangement.spacedBy(12.dp),
     ) {
         Icon(
             imageVector = Icons.Filled.Folder,
             contentDescription = null,
             tint = MaterialTheme.colorScheme.primary,
-            modifier = Modifier.size(22.dp),
+            modifier = Modifier.size(24.dp),
         )
         Text(
             text = if (folder.displayName == "unknown") "未知目录" else folder.displayName,
@@ -100,16 +100,16 @@ fun VideoListItem(
                     it
                 }
             }
-            .padding(horizontal = 16.dp, vertical = 4.dp),
+            .padding(horizontal = 16.dp, vertical = 7.dp),
         verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(10.dp),
+        horizontalArrangement = Arrangement.spacedBy(12.dp),
     ) {
         Box(
             modifier = Modifier
-                .size(width = 52.dp, height = 32.dp)
+                .size(width = 68.dp, height = 42.dp)
                 .background(
                     MaterialTheme.colorScheme.surfaceVariant,
-                    RoundedCornerShape(4.dp),
+                    RoundedCornerShape(6.dp),
                 ),
             contentAlignment = Alignment.Center,
         ) {
@@ -117,13 +117,13 @@ fun VideoListItem(
                 imageVector = Icons.Filled.PlayCircle,
                 contentDescription = null,
                 tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                modifier = Modifier.size(18.dp),
+                modifier = Modifier.size(22.dp),
             )
         }
         Column(modifier = Modifier.weight(1f)) {
             Text(
                 text = video.displayName,
-                style = MaterialTheme.typography.bodySmall,
+                style = MaterialTheme.typography.bodyMedium,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
             )
@@ -134,7 +134,7 @@ fun VideoListItem(
                 WatchStatusTag(video.watchStatus)
                 Text(
                     text = watchMetaLine(video),
-                    style = MaterialTheme.typography.labelSmall,
+                    style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,

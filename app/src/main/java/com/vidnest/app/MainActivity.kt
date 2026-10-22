@@ -152,6 +152,7 @@ class MainActivity : ComponentActivity() {
                     onVideoClick = { videoId -> navController.navigate(Routes.player(videoId)) },
                     onVideoInfoClick = { videoId -> navController.navigate(Routes.detail(videoId)) },
                     onOpenFolderClick = { folderPath -> navController.navigate(Routes.folder(folderPath)) },
+                    onSettingsClick = { navController.navigate(Routes.SETTINGS) },
                 )
             }
             composable(Routes.TAB_FOLDERS) {

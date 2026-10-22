@@ -9,6 +9,7 @@ import com.vidnest.app.data.media.SafVideoSource
 import com.vidnest.app.data.repository.VideoRepository
 import com.vidnest.app.data.settings.SettingsRepository
 import com.vidnest.app.domain.model.EndBehavior
+import com.vidnest.app.domain.model.Speeds
 import com.vidnest.app.domain.model.ResumeBehavior
 import com.vidnest.app.domain.model.VideoSortField
 import com.vidnest.app.util.MediaPermissions
@@ -31,6 +32,7 @@ data class SettingsUiState(
     val resumeBehavior: ResumeBehavior = ResumeBehavior.ALWAYS,
     val endBehavior: EndBehavior = EndBehavior.FROM_START,
     val rememberSpeed: Boolean = true,
+    val speedOptions: List<Float> = Speeds.DEFAULT,
     val safFolders: List<SafFolderUi> = emptyList(),
     val missingCount: Int = 0,
     val versionName: String = "",
@@ -52,16 +54,25 @@ class SettingsViewModel(
         settingsRepository.resumeBehavior,
         settingsRepository.endBehavior,
         settingsRepository.rememberSpeed,
+        settingsRepository.speedOptions,
         combine(settingsRepository.safTrees, permission, missingCount, version) { trees, perm, missing, ver ->
             SafState(trees, perm, missing, ver)
         },
-    ) { sort, resume, end, rememberSpeed, saf ->
+    ) { values ->
+        @Suppress("UNCHECKED_CAST")
+        val sort = values[0] as VideoSortField
+        val resume = values[1] as ResumeBehavior
+        val end = values[2] as EndBehavior
+        val rememberSpeed = values[3] as Boolean
+        val speedOptions = values[4] as List<Float>
+        val saf = values[5] as SafState
         SettingsUiState(
             permissionGranted = saf.perm,
             defaultSort = sort,
             resumeBehavior = resume,
             endBehavior = end,
             rememberSpeed = rememberSpeed,
+            speedOptions = speedOptions,
             safFolders = saf.trees.map { tree ->
                 val uri = Uri.parse(tree)
                 SafFolderUi(
@@ -107,6 +118,10 @@ class SettingsViewModel(
 
     fun setRememberSpeed(value: Boolean) = viewModelScope.launch {
         settingsRepository.setRememberSpeed(value)
+    }
+
+    fun setSpeedOptions(options: List<Float>) = viewModelScope.launch {
+        settingsRepository.setSpeedOptions(options)
     }
 
     /** 保存 SAF 授权并持久化权限（docs/permissions-and-media-scanning.md §2.1） */

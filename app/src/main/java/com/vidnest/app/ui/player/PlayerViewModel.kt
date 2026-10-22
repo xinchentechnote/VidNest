@@ -10,6 +10,7 @@ import com.vidnest.app.data.repository.VideoRepository
 import com.vidnest.app.data.settings.SettingsRepository
 import com.vidnest.app.domain.model.EndBehavior
 import com.vidnest.app.domain.model.ResumeBehavior
+import com.vidnest.app.domain.model.Speeds
 import com.vidnest.app.domain.model.Video
 import com.vidnest.app.domain.model.VideoSortField
 import com.vidnest.app.domain.policy.ProgressPolicy
@@ -49,6 +50,8 @@ data class PlayerUiState(
     val pendingEndAsk: Boolean = false,
     /** 同文件夹内的视频（播放列表，供切换） */
     val playlist: List<Video> = emptyList(),
+    /** 用户在设置中配置的倍速列表 */
+    val speedOptions: List<Float> = Speeds.DEFAULT,
 )
 
 class PlayerViewModel(
@@ -78,6 +81,7 @@ class PlayerViewModel(
     private val playerError = MutableStateFlow<PlayerErrorInfo?>(null)
     private val pendingResumeAsk = MutableStateFlow<Long?>(null)
     private val pendingEndAsk = MutableStateFlow(false)
+    private val speedOptionsState = MutableStateFlow(Speeds.DEFAULT)
     private var initialSpeed = 1.0f
 
     private var endedHandled = false
@@ -96,6 +100,7 @@ class PlayerViewModel(
         pendingResumeAsk,
         pendingEndAsk,
         playlistFlow,
+        speedOptionsState,
     ) { values ->
         @Suppress("UNCHECKED_CAST")
         val video = values[0] as Video?
@@ -106,6 +111,7 @@ class PlayerViewModel(
         val resumeAsk = values[5] as Long?
         val endAsk = values[6] as Boolean
         val playlist = values[7] as List<Video>
+        val options = values[8] as List<Float>
         PlayerUiState(
             video = video,
             isPlaying = cs.isPlaying,
@@ -120,6 +126,7 @@ class PlayerViewModel(
             pendingResumeAsk = resumeAsk,
             pendingEndAsk = endAsk,
             playlist = playlist,
+            speedOptions = options,
         )
     }.stateIn(viewModelScope, SharingStarted.Eagerly, PlayerUiState())
 
@@ -141,6 +148,7 @@ class PlayerViewModel(
             val endBehavior = settingsRepository.endBehavior.first()
             val rememberSpeed = settingsRepository.rememberSpeed.first()
             val savedSpeed = settingsRepository.playbackSpeed.first()
+            speedOptionsState.value = settingsRepository.speedOptions.first()
             initialSpeed = if (rememberSpeed && savedSpeed > 0) savedSpeed else DEFAULT_SPEED
 
             val mediaResume = ProgressPolicy.resolveResumePosition(

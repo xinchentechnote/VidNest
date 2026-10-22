@@ -46,6 +46,7 @@ import androidx.lifecycle.viewmodel.viewModelFactory
 import com.vidnest.app.ServiceLocator
 import com.vidnest.app.domain.model.EndBehavior
 import com.vidnest.app.domain.model.ResumeBehavior
+import com.vidnest.app.domain.model.Speeds
 import com.vidnest.app.domain.model.VideoSortField
 
 /** 设置页：扫描/权限/排序/播放行为/SAF 目录/清理索引/版本 */
@@ -70,6 +71,7 @@ fun SettingsScreen(
     val state by viewModel.uiState.collectAsStateWithLifecycle()
 
     var showSortDialog by remember { mutableStateOf(false) }
+    var showSpeedListDialog by remember { mutableStateOf(false) }
     var showResumeDialog by remember { mutableStateOf(false) }
     var showEndDialog by remember { mutableStateOf(false) }
     var showCleanupDialog by remember { mutableStateOf(false) }
@@ -188,6 +190,12 @@ fun SettingsScreen(
                     onClick = { showEndDialog = true },
                 )
                 HorizontalDivider()
+                ActionRow(
+                    title = "倍速列表",
+                    subtitle = state.speedOptions.joinToString(" · ") { Speeds.formatSpeed(it) },
+                    onClick = { showSpeedListDialog = true },
+                )
+                HorizontalDivider()
                 Row(
                     modifier = Modifier.fillMaxWidth().padding(vertical = 12.dp),
                     verticalAlignment = Alignment.CenterVertically,
@@ -276,6 +284,16 @@ fun SettingsScreen(
             onDismiss = { showResumeDialog = false },
         )
     }
+    if (showSpeedListDialog) {
+        SpeedOptionsDialog(
+            current = state.speedOptions,
+            onConfirm = { options ->
+                viewModel.setSpeedOptions(options)
+                showSpeedListDialog = false
+            },
+            onDismiss = { showSpeedListDialog = false },
+        )
+    }
     if (showEndDialog) {
         RadioDialog(
             title = "播放结束后再次打开",
@@ -317,6 +335,67 @@ fun SettingsScreen(
             },
         )
     }
+}
+
+/** 倍速列表编辑：从全集多选（升序展示），至少保留一个 */
+@Composable
+private fun SpeedOptionsDialog(
+    current: List<Float>,
+    onConfirm: (List<Float>) -> Unit,
+    onDismiss: () -> Unit,
+) {
+    var selected by remember {
+        mutableStateOf(
+            Speeds.UNIVERSE.filter { u -> current.any { kotlin.math.abs(it - u) < 0.001f } }.toSet(),
+        )
+    }
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("倍速列表") },
+        text = {
+            Column {
+                Text(
+                    "勾选播放页可用的倍速（按升序显示，至少保留一个）",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+                Spacer(Modifier.height(8.dp))
+                Speeds.UNIVERSE.forEach { speed ->
+                    val checked = selected.any { kotlin.math.abs(it - speed) < 0.001f }
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clickable {
+                                selected = if (checked) {
+                                    selected - speed
+                                } else {
+                                    selected + speed
+                                }
+                            }
+                            .padding(vertical = 2.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        androidx.compose.material3.Checkbox(
+                            checked = checked,
+                            onCheckedChange = {
+                                selected = if (checked) selected - speed else selected + speed
+                            },
+                        )
+                        Text(Speeds.formatSpeed(speed))
+                    }
+                }
+            }
+        },
+        confirmButton = {
+            TextButton(
+                enabled = selected.isNotEmpty(),
+                onClick = { onConfirm(selected.sorted()) },
+            ) { Text("保存") }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) { Text("取消") }
+        },
+    )
 }
 
 @Composable

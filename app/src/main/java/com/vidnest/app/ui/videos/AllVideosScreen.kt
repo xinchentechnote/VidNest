@@ -10,6 +10,7 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Tab
 import androidx.compose.material3.TabRow
@@ -40,6 +41,7 @@ fun AllVideosScreen(
     onVideoClick: (Long) -> Unit = {},
     onVideoInfoClick: (Long) -> Unit = {},
     onOpenFolderClick: (String) -> Unit = {},
+    onSettingsClick: () -> Unit = {},
 ) {
     val viewModel: AllVideosViewModel = viewModel(
         factory = viewModelFactory {
@@ -55,6 +57,9 @@ fun AllVideosScreen(
             TopAppBar(
                 title = { Text("全部") },
                 actions = {
+                    IconButton(onClick = onSettingsClick) {
+                        Icon(Icons.Filled.Settings, contentDescription = "设置")
+                    }
                     SortMenuButton(current = state.sort, onSelect = viewModel::onSortSelected)
                 },
             )

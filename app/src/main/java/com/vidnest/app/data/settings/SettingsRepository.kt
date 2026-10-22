@@ -10,6 +10,7 @@ import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.datastore.preferences.core.stringSetPreferencesKey
 import androidx.datastore.preferences.preferencesDataStore
 import com.vidnest.app.domain.model.EndBehavior
+import com.vidnest.app.domain.model.Speeds
 import com.vidnest.app.domain.model.ResumeBehavior
 import com.vidnest.app.domain.model.VideoSortField
 import kotlinx.coroutines.flow.Flow
@@ -25,6 +26,7 @@ class SettingsRepository(private val context: Context) {
         val RESUME_BEHAVIOR = stringPreferencesKey("resume_behavior")
         val END_BEHAVIOR = stringPreferencesKey("end_behavior")
         val REMEMBER_SPEED = booleanPreferencesKey("remember_speed")
+        val SPEED_OPTIONS = stringPreferencesKey("speed_options")
         val PLAYBACK_SPEED = floatPreferencesKey("playback_speed")
         val SAF_TREES = stringSetPreferencesKey("saf_trees")
     }
@@ -49,6 +51,11 @@ class SettingsRepository(private val context: Context) {
 
     val rememberSpeed: Flow<Boolean> = context.dataStore.data.map { it[Keys.REMEMBER_SPEED] ?: true }
 
+    /** 用户自定义的倍速列表（升序），默认 1.0/1.5/2.0/2.5/3.0 */
+    val speedOptions: Flow<List<Float>> = context.dataStore.data.map { prefs ->
+        Speeds.decode(prefs[Keys.SPEED_OPTIONS])
+    }
+
     val playbackSpeed: Flow<Float> = context.dataStore.data.map { it[Keys.PLAYBACK_SPEED] ?: 1.0f }
 
     /** 已授权的 SAF 目录 tree URI 集合 */
@@ -68,6 +75,10 @@ class SettingsRepository(private val context: Context) {
 
     suspend fun setRememberSpeed(value: Boolean) {
         context.dataStore.edit { it[Keys.REMEMBER_SPEED] = value }
+    }
+
+    suspend fun setSpeedOptions(options: List<Float>) {
+        context.dataStore.edit { it[Keys.SPEED_OPTIONS] = Speeds.encode(options) }
     }
 
     suspend fun setPlaybackSpeed(value: Float) {

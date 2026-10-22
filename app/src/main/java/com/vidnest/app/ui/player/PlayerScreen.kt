@@ -318,6 +318,7 @@ private fun PlayerContent(
     if (showSpeedSheet) {
         ModalBottomSheet(onDismissRequest = { showSpeedSheet = false }) {
             SpeedSheetContent(
+                options = state.speedOptions,
                 currentSpeed = state.speed,
                 onSelect = { speed ->
                     viewModel.setSpeed(speed)
@@ -376,8 +377,18 @@ private fun ControlsOverlay(
             horizontalArrangement = Arrangement.spacedBy(48.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            FilledIconButton(onClick = { onSeekBy(-10_000) }, modifier = Modifier.size(56.dp)) {
-                Icon(Icons.Filled.FastRewind, contentDescription = "快退10秒", tint = Color.White)
+            FilledIconButton(
+                onClick = { onSeekBy(-10_000) },
+                modifier = Modifier.size(56.dp),
+                colors = IconButtonDefaults.filledIconButtonColors(
+                    containerColor = Color.White.copy(alpha = 0.15f),
+                ),
+            ) {
+                Icon(
+                    Icons.Filled.FastRewind,
+                    contentDescription = "快退10秒",
+                    tint = Color.White.copy(alpha = 0.7f),
+                )
             }
             FilledIconButton(
                 onClick = onTogglePlay,
@@ -393,8 +404,18 @@ private fun ControlsOverlay(
                     modifier = Modifier.size(40.dp),
                 )
             }
-            FilledIconButton(onClick = { onSeekBy(10_000) }, modifier = Modifier.size(56.dp)) {
-                Icon(Icons.Filled.FastForward, contentDescription = "快进10秒", tint = Color.White)
+            FilledIconButton(
+                onClick = { onSeekBy(10_000) },
+                modifier = Modifier.size(56.dp),
+                colors = IconButtonDefaults.filledIconButtonColors(
+                    containerColor = Color.White.copy(alpha = 0.15f),
+                ),
+            ) {
+                Icon(
+                    Icons.Filled.FastForward,
+                    contentDescription = "快进10秒",
+                    tint = Color.White.copy(alpha = 0.7f),
+                )
             }
         }
 
@@ -503,44 +524,46 @@ private fun PlaylistSheetContent(
 }
 
 @Composable
-private fun SpeedSheetContent(currentSpeed: Float, onSelect: (Float) -> Unit) {
+private fun SpeedSheetContent(
+    options: List<Float>,
+    currentSpeed: Float,
+    onSelect: (Float) -> Unit,
+) {
     Column(modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)) {
         Text("播放倍速", style = MaterialTheme.typography.titleMedium)
-        Spacer(Modifier.height(12.dp))
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.SpaceEvenly,
-        ) {
-            // 3 行 3 列网格排布
-            Column {
-                SPEED_OPTIONS.chunked(3).forEach { rowOptions ->
-                    Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                        rowOptions.forEach { speed ->
-                            val selected = kotlin.math.abs(speed - currentSpeed) < 0.01f
-                            FilledTonalButton(
-                                onClick = { onSelect(speed) },
-                                colors = ButtonDefaults.filledTonalButtonColors(
-                                    containerColor = if (selected) {
-                                        MaterialTheme.colorScheme.primary
-                                    } else {
-                                        MaterialTheme.colorScheme.surfaceVariant
-                                    },
-                                    contentColor = if (selected) {
-                                        MaterialTheme.colorScheme.onPrimary
-                                    } else {
-                                        MaterialTheme.colorScheme.onSurface
-                                    },
-                                ),
-                            ) {
-                                Text(formatSpeed(speed))
-                            }
-                        }
+        Text(
+            "可在设置中自定义倍速列表",
+            style = MaterialTheme.typography.labelSmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+        Spacer(Modifier.height(4.dp))
+        LazyColumn(modifier = Modifier.height(320.dp)) {
+            items(options, key = { it }) { speed ->
+                val selected = kotlin.math.abs(speed - currentSpeed) < 0.01f
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clickable { onSelect(speed) }
+                        .padding(vertical = 14.dp, horizontal = 4.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Text(
+                        text = formatSpeed(speed),
+                        style = MaterialTheme.typography.bodyLarge,
+                        color = if (selected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface,
+                    )
+                    Spacer(Modifier.weight(1f))
+                    if (selected) {
+                        Text(
+                            text = "当前",
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.primary,
+                        )
                     }
-                    Spacer(Modifier.height(12.dp))
                 }
             }
         }
-        Spacer(Modifier.height(24.dp))
+        Spacer(Modifier.height(16.dp))
     }
 }
 

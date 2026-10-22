@@ -42,16 +42,17 @@
 |---|---|---|---|
 | sessionId | String | PK（UUID） | 会话标识，跨进程死亡持久化 |
 | videoId | Long | notNull, FK→videos.id CASCADE, **索引(videoId, counted)** | 归属视频；索引用于"领养未计数会话"查询 |
-| accumulatedMs | Long | notNull, default 0 | 累计实际播放时长（暂停不计入），达到阈值即计数 |
+| accumulatedMs | Long | notNull, default 0 | 累计媒体播放时长（倍速后消耗的内容时长），达到阈值即计数 |
+| wallMs | Long | notNull, default 0（v2 新增，defaultValue="0"） | 累计实际墙钟播放时长（= 媒体增量/倍速），与媒体时长对比用于统计"倍速节省" | 
 | counted | Boolean | notNull, default 0 | 是否已计入播放次数，保证每会话至多计一次 |
 | startedAt | Long | notNull | 会话开始时间 |
 | updatedAt | Long | notNull | 废弃清理与领养窗口判断 |
 
 延迟确认机制的崩溃安全性：
 
-- `accumulatedMs` 与断点在**同一事务**落库（每 5s），进程被杀最多丢最近 5s 计时，不丢不重。
+- `accumulatedMs`（媒体）/ `wallMs`（实际）与断点在**同一事务**落库（每 5s），进程被杀最多丢最近 5s 计时，不丢不重。
 - 重新打开同一视频时**领养** 24h 内未计数的旧会话继续累计（不丢失、不重复）；超过 24h 的未计数会话在启动时清理（视为废弃播放）。
-- 已计数会话在退出播放器时删除（数据已固化进 record）。
+- **v2 起：已计数会话保留**——它们是播放统计（按天/周/月、按视频）的数据源，仅过期未计数会话被清理。
 
 ## 4. Room 迁移策略
 

@@ -35,9 +35,11 @@ data class PlaybackRecordEntity(
 )
 
 /**
- * 播放会话表：崩溃安全的播放次数统计。
- * - accumulatedMs 达到 PlayCountPolicy 阈值时 counted 置位并 playCount+1（同一事务）；
- * - 进程死亡后 24h 内未计数会话可被“领养”继续累计，过期未计数会话启动时清理。
+ * 播放会话表：崩溃安全的播放次数统计 + 播放统计的数据源。
+ * - accumulatedMs（媒体时长）/ wallMs（实际时长）达到 PlayCountPolicy 阈值时
+ *   counted 置位并 playCount+1（同一事务）；
+ * - 进程死亡后 24h 内未计数会话可被“领养”继续累计，过期未计数会话启动时清理；
+ * - 已计数会话保留作为播放历史统计的数据源（v2 起不再清理，见 cleanup）。
  */
 @Entity(
     tableName = "playback_sessions",
@@ -54,7 +56,10 @@ data class PlaybackRecordEntity(
 data class PlaybackSessionEntity(
     @PrimaryKey @ColumnInfo(name = "sessionId") val sessionId: String,
     @ColumnInfo(name = "videoId") val videoId: Long,
+    /** 媒体时间增量（倍速后消耗的内容时长） */
     @ColumnInfo(name = "accumulatedMs") val accumulatedMs: Long,
+    /** 实际墙钟播放时长（= 媒体增量 / 倍速），用于统计“省下的时间” */
+    @ColumnInfo(name = "wallMs", defaultValue = "0") val wallMs: Long = 0,
     @ColumnInfo(name = "counted") val counted: Boolean,
     @ColumnInfo(name = "startedAt") val startedAt: Long,
     @ColumnInfo(name = "updatedAt") val updatedAt: Long,

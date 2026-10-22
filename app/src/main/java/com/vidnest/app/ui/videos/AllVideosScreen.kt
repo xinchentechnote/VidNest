@@ -37,7 +37,6 @@ import com.vidnest.app.ui.components.VideoListItem
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun AllVideosScreen(
-    onBack: () -> Unit,
     onVideoClick: (Long) -> Unit = {},
     onVideoInfoClick: (Long) -> Unit = {},
     onOpenFolderClick: (String) -> Unit = {},
@@ -54,12 +53,7 @@ fun AllVideosScreen(
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text("全部视频") },
-                navigationIcon = {
-                    IconButton(onClick = onBack) {
-                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "返回")
-                    }
-                },
+                title = { Text("全部") },
                 actions = {
                     SortMenuButton(current = state.sort, onSelect = viewModel::onSortSelected)
                 },

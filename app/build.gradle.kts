@@ -16,7 +16,7 @@ android {
         minSdk = 24
         targetSdk = 36
         versionCode = 1
-        versionName = "1.0.3"
+        versionName = "1.0.4"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         vectorDrawables {
@@ -62,8 +62,9 @@ android {
         }
     }
     sourceSets {
-        // Room 导出的 schema 供迁移测试使用
-        getByName("test").assets.srcDir("$projectDir/schemas")
+        // Room 导出的 schema 供本地迁移测试使用。
+        // Robolectric 读取 debug 变体合并资源，因此挂到 debug assets（release 不受影响）
+        getByName("debug").assets.srcDir("$projectDir/schemas")
     }
 }
 

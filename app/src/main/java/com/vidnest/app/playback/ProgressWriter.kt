@@ -40,10 +40,11 @@ sealed interface WriteRequest {
         val nowMs: Long,
     ) : WriteRequest
 
-    /** 会话累计播放时长落库（崩溃安全） */
+    /** 会话累计播放时长落库（崩溃安全）：媒体时长 + 实际墙钟时长 */
     data class SessionTick(
         val sessionId: String,
         val accumulatedMs: Long,
+        val wallMs: Long,
         val nowMs: Long,
     ) : WriteRequest
 
@@ -133,6 +134,7 @@ class ProgressWriter(
                 is WriteRequest.SessionTick -> sessionRepository.updateAccumulated(
                     sessionId = request.sessionId,
                     accumulatedMs = request.accumulatedMs,
+                    wallMs = request.wallMs,
                     nowMs = request.nowMs,
                 )
 

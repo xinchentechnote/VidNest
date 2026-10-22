@@ -23,6 +23,14 @@ object Formatters {
     fun durationOrUnknown(totalMs: Long): String =
         if (totalMs > 0) duration(totalMs) else "--:--"
 
+    /** 统计页用紧凑时长：3.2 小时 / 45 分钟 / 30 秒 */
+    fun durationCompact(totalMs: Long): String = when {
+        totalMs >= 3_600_000 -> String.format(Locale.US, "%.1f 小时", totalMs / 3_600_000.0)
+        totalMs >= 60_000 -> "${totalMs / 60_000} 分钟"
+        totalMs > 0 -> "${totalMs / 1_000} 秒"
+        else -> "0 分钟"
+    }
+
     /** 1.2 GB / 345 MB / 56 KB / 512 B */
     fun fileSize(bytes: Long): String {
         if (bytes < 0) return "--"

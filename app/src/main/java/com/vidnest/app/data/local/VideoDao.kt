@@ -99,4 +99,16 @@ interface VideoDao {
 
     @Query("SELECT COUNT(*) FROM videos WHERE availabilityStatus = ${VideoEntity.STATUS_AVAILABLE}")
     fun observeAvailableCount(): Flow<Int>
+
+    /** 播放历史：按最近播放倒序（含在看与已看完，未播放的不出现） */
+    @Query(
+        "SELECT v.*, r.videoId AS r_videoId, r.positionMs AS r_positionMs, " +
+            "r.durationMs AS r_durationMs, r.playCount AS r_playCount, " +
+            "r.lastPlayedAt AS r_lastPlayedAt, r.completed AS r_completed, " +
+            "r.lastPlaybackSpeed AS r_lastPlaybackSpeed, r.updatedAt AS r_updatedAt " +
+            "FROM videos v JOIN playback_records r ON r.videoId = v.id " +
+            "WHERE v.availabilityStatus = ${VideoEntity.STATUS_AVAILABLE} AND r.lastPlayedAt IS NOT NULL " +
+            "ORDER BY r.lastPlayedAt DESC",
+    )
+    fun observeHistory(): Flow<List<VideoWithRecordRow>>
 }

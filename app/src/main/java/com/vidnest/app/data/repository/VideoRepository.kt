@@ -43,6 +43,10 @@ class VideoRepository(
 
     fun observeAvailableCount(): Flow<Int> = videoDao.observeAvailableCount()
 
+    /** 播放历史：按最近播放倒序（在看 + 已看完） */
+    fun observeHistory(): Flow<List<Video>> =
+        videoDao.observeHistory().map { it.toDomainList() }
+
     suspend fun getVideo(videoId: Long): Video? = withContext(ioDispatcher) {
         videoDao.getById(videoId)?.toDomain(null)
     }

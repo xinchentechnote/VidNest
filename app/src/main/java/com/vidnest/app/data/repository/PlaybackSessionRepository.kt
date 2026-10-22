@@ -1,12 +1,15 @@
 package com.vidnest.app.data.repository
 
 import androidx.room.withTransaction
+import com.vidnest.app.data.local.PerVideoStatsRow
 import com.vidnest.app.data.local.PlaybackSessionDao
+import com.vidnest.app.data.local.UsageStatsRow
 import com.vidnest.app.data.local.PlaybackSessionEntity
 import com.vidnest.app.data.local.VidNestDatabase
 import com.vidnest.app.domain.policy.PlayCountPolicy
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.withContext
 import java.util.UUID
 
@@ -33,6 +36,7 @@ class PlaybackSessionRepository(
                     sessionId = UUID.randomUUID().toString(),
                     videoId = videoId,
                     accumulatedMs = 0,
+                    wallMs = 0,
                     counted = false,
                     startedAt = nowMs,
                     updatedAt = nowMs,
@@ -40,12 +44,22 @@ class PlaybackSessionRepository(
             }
         }
 
-    suspend fun updateAccumulated(sessionId: String, accumulatedMs: Long, nowMs: Long) {
+    suspend fun updateAccumulated(
+        sessionId: String,
+        accumulatedMs: Long,
+        wallMs: Long,
+        nowMs: Long,
+    ) {
         db.withTransaction {
             val current = sessionDao.get(sessionId) ?: return@withTransaction
-            if (!current.counted) {
-                sessionDao.upsert(current.copy(accumulatedMs = accumulatedMs, updatedAt = nowMs))
-            }
+            // v2 起：counted 会话也持续落库——它们是播放统计的数据源
+            sessionDao.upsert(
+                current.copy(
+                    accumulatedMs = accumulatedMs,
+                    wallMs = wallMs,
+                    updatedAt = nowMs,
+                ),
+            )
         }
     }
 
@@ -60,12 +74,27 @@ class PlaybackSessionRepository(
 
     suspend fun delete(sessionId: String) = withContext(ioDispatcher) { sessionDao.delete(sessionId) }
 
-    /** 返回清理数量（供设置页展示） */
+    // ===== 播放统计（会话即历史）=====
+
+    fun observeDailyStats(sinceMs: Long): Flow<List<UsageStatsRow>> =
+        sessionDao.observeDailyStats(sinceMs)
+
+    fun observeWeeklyStats(sinceMs: Long): Flow<List<UsageStatsRow>> =
+        sessionDao.observeWeeklyStats(sinceMs)
+
+    fun observeMonthlyStats(sinceMs: Long): Flow<List<UsageStatsRow>> =
+        sessionDao.observeMonthlyStats(sinceMs)
+
+    fun observePerVideoStats(): Flow<List<PerVideoStatsRow>> =
+        sessionDao.observePerVideoStats()
+
+    /**
+     * 清理过期未计数会话。v2 起已计数会话保留——它们是播放历史统计的数据源。
+     */
     suspend fun cleanup(nowMs: Long): Int = withContext(ioDispatcher) {
         val staleCutoff = nowMs - PlayCountPolicy.SESSION_ADOPT_WINDOW_MS
         db.withTransaction {
-            val removed = sessionDao.deleteStaleUncounted(staleCutoff)
-            removed + sessionDao.deleteCounted()
+            sessionDao.deleteStaleUncounted(staleCutoff)
         }
     }
 }

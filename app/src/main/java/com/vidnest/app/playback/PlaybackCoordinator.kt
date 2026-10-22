@@ -33,6 +33,7 @@ class PlaybackCoordinator(
     private var sessionId: String? = null
     private var sessionCounted: Boolean = false
     private var sessionAccumulatedMs: Long = 0
+    private var sessionWallMs: Long = 0
 
     /** 打开视频：领养/新建播放会话并记录初始断点（suspend：需读库领养） */
     suspend fun begin(videoId: Long, resumePositionMs: Long, nowMs: Long = System.currentTimeMillis()) {
@@ -43,6 +44,7 @@ class PlaybackCoordinator(
         sessionId = session.sessionId
         sessionCounted = session.counted
         sessionAccumulatedMs = session.accumulatedMs
+        sessionWallMs = session.wallMs
     }
 
     /**
@@ -61,9 +63,12 @@ class PlaybackCoordinator(
         lastKnownDurationMs = durationMs
         lastKnownSpeed = speed
 
-        // 实际播放时长累计（暂停/seek 不累计）
-        if (isPlaying && mediaDeltaMs > 0 && sessionId != null && !sessionCounted) {
+        // 实际播放时长累计（暂停/seek 不累计）；实际墙钟时长 = 媒体增量 / 倍速
+        if (isPlaying && mediaDeltaMs > 0 && sessionId != null) {
             sessionAccumulatedMs += mediaDeltaMs
+            if (!sessionCounted) {
+                sessionWallMs += (mediaDeltaMs / (speed ?: 1f).coerceIn(0.25f, 8f)).toLong()
+            }
         }
 
         // 达到阈值：计数 + 断点同事务落库（每会话至多一次）
@@ -128,7 +133,14 @@ class PlaybackCoordinator(
             ),
         )
         sessionId?.let {
-            writer.submit(WriteRequest.SessionTick(sessionId = it, accumulatedMs = sessionAccumulatedMs, nowMs = nowMs))
+            writer.submit(
+                WriteRequest.SessionTick(
+                    sessionId = it,
+                    accumulatedMs = sessionAccumulatedMs,
+                    wallMs = sessionWallMs,
+                    nowMs = nowMs,
+                ),
+            )
         }
         lastSaveElapsedMs = nowMs
     }

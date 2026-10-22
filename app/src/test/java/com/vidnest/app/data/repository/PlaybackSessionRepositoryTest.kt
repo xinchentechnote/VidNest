@@ -61,10 +61,11 @@ class PlaybackSessionRepositoryTest {
     @Test
     fun `领养24小时内未计数会话并延续累计`() = runTest {
         val first = repo.adoptOrCreate(1, now)
-        repo.updateAccumulated(first.sessionId, 6_000, now + 1_000)
+        repo.updateAccumulated(first.sessionId, 6_000, 2_000, now + 1_000)
         val adopted = repo.adoptOrCreate(1, now + 2_000)
         assertEquals(first.sessionId, adopted.sessionId)
         assertEquals(6_000, adopted.accumulatedMs)
+        assertEquals(2_000, adopted.wallMs)
     }
 
     @Test
@@ -74,6 +75,13 @@ class PlaybackSessionRepositoryTest {
         val fresh = repo.adoptOrCreate(1, twoDaysLater)
         org.junit.Assert.assertNotEquals(first.sessionId, fresh.sessionId)
         assertEquals(0, fresh.accumulatedMs)
+    }
+
+    @Test
+    fun `墙钟时长随累计落库`() = runTest {
+        val s = repo.adoptOrCreate(1, now)
+        repo.updateAccumulated(s.sessionId, 6_000, 3_000, now + 1_000)
+        assertEquals(3_000, db.playbackSessionDao().get(s.sessionId)!!.wallMs)
     }
 
     @Test
@@ -92,16 +100,17 @@ class PlaybackSessionRepositoryTest {
         repo.markCounted(s.sessionId, now + 2)
         val after = db.playbackSessionDao().get(s.sessionId)!!
         assertTrue(after.counted)
-        // 已计数会话不再累计
-        repo.updateAccumulated(s.sessionId, 99_999, now + 3)
-        assertEquals(0, db.playbackSessionDao().get(s.sessionId)!!.accumulatedMs)
+        // v2 起：已计数会话仍持续累计落库（播放统计的数据源）
+        repo.updateAccumulated(s.sessionId, 99_999, 50_000, now + 3)
+        val updated = db.playbackSessionDao().get(s.sessionId)!!
+        assertEquals(99_999, updated.accumulatedMs)
+        assertEquals(50_000, updated.wallMs)
     }
 
     @Test
-    fun `cleanup删除已计数与过期未计数会话`() = runTest {
+    fun `cleanup只删除过期未计数会话_已计数会话保留作统计`() = runTest {
         val counted = repo.adoptOrCreate(1, now)
         repo.markCounted(counted.sessionId, now)
-        val stale = db.playbackSessionDao().get(counted.sessionId)!!
         // 过期未计数会话
         db.playbackSessionDao().upsert(
             PlaybackSessionEntity(
@@ -110,9 +119,9 @@ class PlaybackSessionRepositoryTest {
             ),
         )
         val removed = repo.cleanup(now + 1)
-        assertEquals(2, removed)
-        assertNull(db.playbackSessionDao().get(counted.sessionId))
+        assertEquals(1, removed)
+        // v2 起：已计数会话保留（播放统计的数据源）
+        assertNotNull(db.playbackSessionDao().get(counted.sessionId))
         assertNull(db.playbackSessionDao().get("stale"))
-        assertNotNull(db.videoDao().getById(1))
     }
 }

@@ -61,14 +61,18 @@ data class VideoWithRecordRow(
     @Embedded(prefix = "r_") val record: PlaybackRecordRow?,
 )
 
-/** playback_records 联表投影（videoId 联接后别名，避免与主键冲突） */
+/**
+ * playback_records 联表投影。
+ * 注意：@Embedded(prefix = "r_") 的匹配规则是“结果列去掉 r_ 前缀后等于字段列名”，
+ * 因此这里字段名保持裸名（videoId 等），SQL 侧用 r_videoId 等别名对应。
+ */
 data class PlaybackRecordRow(
-    @ColumnInfo(name = "r_videoId") val videoId: Long,
-    @ColumnInfo(name = "r_positionMs") val positionMs: Long,
-    @ColumnInfo(name = "r_durationMs") val durationMs: Long,
-    @ColumnInfo(name = "r_playCount") val playCount: Int,
-    @ColumnInfo(name = "r_lastPlayedAt") val lastPlayedAt: Long?,
-    @ColumnInfo(name = "r_completed") val completed: Boolean,
-    @ColumnInfo(name = "r_lastPlaybackSpeed") val lastPlaybackSpeed: Float?,
-    @ColumnInfo(name = "r_updatedAt") val updatedAt: Long,
+    val videoId: Long,
+    val positionMs: Long,
+    val durationMs: Long,
+    val playCount: Int,
+    val lastPlayedAt: Long?,
+    val completed: Boolean,
+    val lastPlaybackSpeed: Float?,
+    val updatedAt: Long,
 )

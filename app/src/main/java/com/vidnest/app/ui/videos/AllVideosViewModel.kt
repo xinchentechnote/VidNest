@@ -40,6 +40,8 @@ data class AllVideosUiState(
     val filter: StatusFilter = StatusFilter.ALL,
     val videos: List<Video> = emptyList(),
     val isFromSearch: Boolean = false,
+    /** 各状态的视频数量（Tab 角标，不受当前筛选影响） */
+    val counts: Map<StatusFilter, Int> = emptyMap(),
 )
 
 class AllVideosViewModel(
@@ -75,6 +77,7 @@ class AllVideosViewModel(
             filter = f,
             videos = videos.filter { f.matches(it) },
             isFromSearch = q.isNotBlank(),
+            counts = StatusFilter.entries.associate { tab -> tab to videos.count { tab.matches(it) } },
         )
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), AllVideosUiState())
 

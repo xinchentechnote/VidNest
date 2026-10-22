@@ -98,6 +98,28 @@ class VideoDaoTest {
     }
 
     @Test
+    fun `联表查询正确映射播放记录（回归：Embedded前缀匹配）`() = runTest {
+        videoDao.upsertAll(listOf(video(uri = "content://media/1", path = "Movies", name = "a.mp4")))
+        val id1 = videoDao.getByUri("content://media/1")!!.id
+        recordDao.upsert(
+            PlaybackRecordEntity(
+                videoId = id1, positionMs = 30_000, durationMs = 60_000, playCount = 7,
+                lastPlayedAt = 999, completed = true, lastPlaybackSpeed = 2.0f, updatedAt = 999,
+            ),
+        )
+        val repo = com.vidnest.app.data.repository.VideoRepository(videoDao)
+        val videos = repo.observeAllVideos(null, com.vidnest.app.domain.model.VideoSortField.NAME).first()
+        assertEquals(1, videos.size)
+        val playback = videos.first().playback
+        assertNotNull(playback)
+        assertEquals(30_000, playback!!.positionMs)
+        assertEquals(7, playback.playCount)
+        assertEquals(true, playback.completed)
+        assertEquals(2.0f, playback.lastPlaybackSpeed!!, 0.001f)
+        assertEquals(com.vidnest.app.domain.model.WatchStatus.COMPLETED, videos.first().watchStatus)
+    }
+
+    @Test
     fun `根目录层级聚合包含子目录的数量与大小`() = runTest {
         val v1 = video(uri = "content://media/1", path = "Movies", name = "a.mp4", size = 100)
         val v2 = video(uri = "content://media/2", path = "Movies/sub", name = "b.mp4", size = 300)

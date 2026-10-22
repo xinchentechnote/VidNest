@@ -1,6 +1,5 @@
 package com.vidnest.app.ui.videos
 
-import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -9,11 +8,11 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
-import androidx.compose.foundation.rememberScrollState
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.FilterChip
+import androidx.compose.material3.Tab
+import androidx.compose.material3.TabRow
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -41,6 +40,7 @@ fun AllVideosScreen(
     onBack: () -> Unit,
     onVideoClick: (Long) -> Unit = {},
     onVideoInfoClick: (Long) -> Unit = {},
+    onOpenFolderClick: (String) -> Unit = {},
 ) {
     val viewModel: AllVideosViewModel = viewModel(
         factory = viewModelFactory {
@@ -80,19 +80,17 @@ fun AllVideosScreen(
                     .fillMaxWidth()
                     .padding(horizontal = 16.dp, vertical = 8.dp),
             )
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .horizontalScroll(rememberScrollState())
-                    .padding(horizontal = 16.dp),
-                verticalAlignment = Alignment.CenterVertically,
+            // 观看状态 Tab：全部 / 未播放 / 在看 / 已看完（含数量）
+            TabRow(
+                selectedTabIndex = state.filter.ordinal,
+                modifier = Modifier.fillMaxWidth(),
             ) {
                 StatusFilter.entries.forEach { f ->
-                    FilterChip(
+                    val count = state.counts[f] ?: 0
+                    Tab(
                         selected = state.filter == f,
                         onClick = { viewModel.onFilterSelected(f) },
-                        label = { Text(f.label) },
-                        modifier = Modifier.padding(end = 8.dp),
+                        text = { Text("${f.label} ($count)") },
                     )
                 }
             }
@@ -111,6 +109,7 @@ fun AllVideosScreen(
                                 video = video,
                                 onClick = { onVideoClick(video.id) },
                                 onInfoClick = { onVideoInfoClick(video.id) },
+                                onOpenFolderClick = { onOpenFolderClick(video.folderPath) },
                             )
                         }
                     }

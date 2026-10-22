@@ -24,7 +24,7 @@ Kotlin · Jetpack Compose + Material 3 · Media3 ExoPlayer 1.11.1 · Room 2.8.5 
 
 - minSdk 24（Android 7.0+），targetSdk 36，compileSdk 37
 - 权限最小化：仅 `READ_MEDIA_VIDEO`（Android 13+）与 `READ_EXTERNAL_STORAGE`（≤Android 12L）；不申请 MANAGE_EXTERNAL_STORAGE
-- 分层架构：UI（Compose）→ ViewModel → Repository / PlayerController → Room / MediaStore；策略纯函数集中在 `domain/policy`；详细设计见 [docs/](docs/)（需求、架构、数据模型、权限与扫描、播放与断点、测试计划）
+- 分层架构：UI（Compose）→ ViewModel → Repository / PlayerController → Room / MediaStore；策略纯函数集中在 `domain/policy`；详细设计见 [docs/](docs/)（需求、架构、数据模型、权限与扫描、播放与断点、测试计划、[UI 原型图](docs/ui-prototype.md)）
 
 ## 构建与安装
 

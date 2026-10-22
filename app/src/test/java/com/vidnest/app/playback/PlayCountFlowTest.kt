@@ -171,6 +171,73 @@ class PlayCountFlowTest {
     }
 
     @Test
+    fun `1x播放时实际时长等于媒体时长_计数后仍持续累计`() = runTest {
+        val coordinator = PlaybackCoordinator(recordRepo, sessionRepo, writer)
+        coordinator.begin(1, resumePositionMs = 0, nowMs = 0)
+        // 1x：500ms tick 间隔对应 500ms 媒体增量；24 ticks = 媒体/墙钟各 12s
+        // （阈值 10s 在中段越过，修复前 counted 后墙钟停止累计 → 平均倍速虚高 1.2x）
+        for (i in 1..24) {
+            coordinator.onTick(500L * i, 60_000, 1f, true, mediaDeltaMs = 500, nowMs = i * 500L)
+        }
+        coordinator.onPause(nowMs = 12_500)
+        writer.awaitIdle()
+        val session = querySession(1L)
+        assertEquals(12_000, session.accumulatedMs)
+        assertEquals(12_000, session.wallMs)
+    }
+
+    @Test
+    fun `3x播放时实际时长约为媒体时长三分之一`() = runTest {
+        val coordinator = PlaybackCoordinator(recordRepo, sessionRepo, writer)
+        coordinator.begin(1, resumePositionMs = 0, nowMs = 0)
+        // 3x 倍速：每 500ms tick 媒体 +1500ms，墙钟 500ms
+        for (i in 1..12) {
+            coordinator.onTick(1_500L * i, 60_000, 3f, true, mediaDeltaMs = 1_500, nowMs = i * 500L)
+        }
+        coordinator.onPause(nowMs = 6_500)
+        writer.awaitIdle()
+        val session = querySession(1L)
+        assertEquals(18_000, session.accumulatedMs)
+        assertEquals(6_000, session.wallMs)
+    }
+
+    @Test
+    fun `ENDED时补足最后一段时长`() = runTest {
+        val coordinator = PlaybackCoordinator(recordRepo, sessionRepo, writer)
+        coordinator.begin(1, resumePositionMs = 0, nowMs = 0)
+        // 2s 视频 @1x：3 ticks 到 1500ms（媒体/墙钟各 1500），最后 500ms 由 onEnded 补足
+        for (i in 1..3) {
+            coordinator.onTick(500L * i, 2_000, 1f, true, mediaDeltaMs = 500, nowMs = i * 500L)
+        }
+        coordinator.onEnded(nowMs = 2_000)
+        writer.awaitIdle()
+        val session = querySession(1L)
+        assertEquals(2_000, session.accumulatedMs)
+        assertEquals(2_000, session.wallMs)
+        val record = recordRepo.get(1L)!!
+        assertEquals(true, record.completed)
+        assertEquals(0, record.positionMs)
+    }
+
+    private fun querySession(videoId: Long): com.vidnest.app.data.local.PlaybackSessionEntity {
+        db.openHelper.writableDatabase.query(
+            "SELECT * FROM playback_sessions WHERE videoId = ? ORDER BY startedAt DESC LIMIT 1",
+            arrayOf(videoId),
+        ).use { cursor ->
+            assertEquals(true, cursor.moveToFirst())
+            return com.vidnest.app.data.local.PlaybackSessionEntity(
+                sessionId = cursor.getString(0),
+                videoId = cursor.getLong(1),
+                accumulatedMs = cursor.getLong(2),
+                wallMs = cursor.getLong(3),
+                counted = cursor.getInt(4) == 1,
+                startedAt = cursor.getLong(5),
+                updatedAt = cursor.getLong(6),
+            )
+        }
+    }
+
+    @Test
     fun `计数与断点同步落库`() = runTest {
         val coordinator = PlaybackCoordinator(recordRepo, sessionRepo, writer)
         coordinator.begin(1, resumePositionMs = 0, nowMs = 0)

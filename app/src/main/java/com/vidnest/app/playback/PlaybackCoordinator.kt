@@ -33,7 +33,11 @@ class PlaybackCoordinator(
     private var sessionId: String? = null
     private var sessionCounted: Boolean = false
     private var sessionAccumulatedMs: Long = 0
-    private var sessionWallMs: Long = 0
+
+    /** 实际墙钟时长用 Double 累计，避免每 tick 整除截断漂移 */
+    private var sessionWallMsDouble: Double = 0.0
+    private var lastTickNowMs: Long = 0
+    private var lastTickWasPlaying: Boolean = false
 
     /** 打开视频：领养/新建播放会话并记录初始断点（suspend：需读库领养） */
     suspend fun begin(videoId: Long, resumePositionMs: Long, nowMs: Long = System.currentTimeMillis()) {
@@ -44,7 +48,10 @@ class PlaybackCoordinator(
         sessionId = session.sessionId
         sessionCounted = session.counted
         sessionAccumulatedMs = session.accumulatedMs
-        sessionWallMs = session.wallMs
+        sessionWallMsDouble = session.wallMs.toDouble()
+        lastTickNowMs = nowMs
+        // begin 后立即装载并播放，首段间隔计入墙钟（buffering 期间由 2×tick 上限兜底）
+        lastTickWasPlaying = true
     }
 
     /**
@@ -63,13 +70,15 @@ class PlaybackCoordinator(
         lastKnownDurationMs = durationMs
         lastKnownSpeed = speed
 
-        // 实际播放时长累计（暂停/seek 不累计）；实际墙钟时长 = 媒体增量 / 倍速
+        // 媒体时长累计（暂停/seek 跳变不累计）
         if (isPlaying && mediaDeltaMs > 0 && sessionId != null) {
             sessionAccumulatedMs += mediaDeltaMs
-            if (!sessionCounted) {
-                sessionWallMs += (mediaDeltaMs / (speed ?: 1f).coerceIn(0.25f, 8f)).toLong()
-            }
+            // 实际墙钟时长 = 媒体增量 / 当时倍速（墙钟积分的精确近似：
+            // mediaDelta = speed × Δt_wall，1x 时两者相等；2x 听 1 小时内容 → wall 30 分钟）
+            sessionWallMsDouble += mediaDeltaMs / (speed ?: 1f).coerceIn(0.25f, 8f)
         }
+        lastTickNowMs = nowMs
+        lastTickWasPlaying = isPlaying
 
         // 达到阈值：计数 + 断点同事务落库（每会话至多一次）
         if (!sessionCounted && sessionId != null &&
@@ -105,9 +114,30 @@ class PlaybackCoordinator(
         saveProgress(nowMs)
     }
 
-    /** 播放结束：completed 置位、断点归零（下次从头），不得把断点存成末尾 */
+    /** 播放结束：补足最后一个 tick 到结尾的时长，completed 置位、断点归零（下次从头） */
     fun onEnded(nowMs: Long = System.currentTimeMillis()) {
         if (videoId < 0) return
+        // 丢尾补偿：最后 tick 与结尾之间的媒体/墙钟时长
+        if (lastKnownDurationMs > lastKnownPositionMs &&
+            lastKnownDurationMs - lastKnownPositionMs <= 2 * TICK_INTERVAL_MS * 8
+        ) {
+            val tail = lastKnownDurationMs - lastKnownPositionMs
+            sessionAccumulatedMs += tail
+            if (lastTickWasPlaying) {
+                sessionWallMsDouble += tail / (lastKnownSpeed ?: 1f).coerceIn(0.25f, 8f)
+            }
+            lastKnownPositionMs = lastKnownDurationMs
+        }
+        sessionId?.let {
+            writer.submit(
+                WriteRequest.SessionTick(
+                    sessionId = it,
+                    accumulatedMs = sessionAccumulatedMs,
+                    wallMs = Math.round(sessionWallMsDouble),
+                    nowMs = nowMs,
+                ),
+            )
+        }
         writer.submit(WriteRequest.MarkCompleted(videoId = videoId, speed = lastKnownSpeed, nowMs = nowMs))
     }
 
@@ -137,7 +167,7 @@ class PlaybackCoordinator(
                 WriteRequest.SessionTick(
                     sessionId = it,
                     accumulatedMs = sessionAccumulatedMs,
-                    wallMs = sessionWallMs,
+                    wallMs = Math.round(sessionWallMsDouble),
                     nowMs = nowMs,
                 ),
             )
@@ -147,5 +177,6 @@ class PlaybackCoordinator(
 
     private companion object {
         const val SAVE_INTERVAL_MS = 5_000L
+        const val TICK_INTERVAL_MS = 500L
     }
 }

@@ -3,7 +3,7 @@ package com.vidnest.app.ui.player
 import android.app.Activity
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -14,13 +14,15 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.FastForward
 import androidx.compose.material.icons.filled.FastRewind
 import androidx.compose.material.icons.filled.Pause
+import androidx.compose.material.icons.filled.PlaylistPlay
 import androidx.compose.material.icons.filled.ScreenRotation
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Speed
@@ -50,7 +52,9 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.core.view.WindowCompat
@@ -78,7 +82,7 @@ fun PlayerScreen(
         factory = viewModelFactory {
             initializer {
                 PlayerViewModel(
-                    videoId = videoId,
+                    initialVideoId = videoId,
                     videoRepository = ServiceLocator.videoRepository,
                     recordRepository = ServiceLocator.playbackRecordRepository,
                     sessionRepository = ServiceLocator.playbackSessionRepository,
@@ -149,6 +153,7 @@ private fun PlayerContent(
     val context = LocalContext.current
     var controlsVisible by remember { mutableStateOf(true) }
     var showSpeedSheet by remember { mutableStateOf(false) }
+    var showPlaylistSheet by remember { mutableStateOf(false) }
     var fullscreen by remember { mutableStateOf(false) }
     var dragging by remember { mutableStateOf(false) }
     var dragPosition by remember { mutableFloatStateOf(0f) }
@@ -174,10 +179,12 @@ private fun PlayerContent(
     Box(
         modifier = Modifier
             .fillMaxSize()
-            .clickable(
-                interactionSource = remember { MutableInteractionSource() },
-                indication = null,
-            ) { controlsVisible = !controlsVisible },
+            .pointerInput(Unit) {
+                detectTapGestures(
+                    onTap = { controlsVisible = !controlsVisible },
+                    onDoubleTap = { viewModel.togglePlay() },
+                )
+            },
     ) {
         // 视频画面
         AndroidView(
@@ -240,6 +247,7 @@ private fun PlayerContent(
                     viewModel.seekTo(dragPosition.toLong())
                 },
                 onSpeedClick = { showSpeedSheet = true },
+                onPlaylistClick = { showPlaylistSheet = true },
                 onToggleFullscreen = {
                     val activity = context as? android.app.Activity
                     if (activity != null) {
@@ -293,6 +301,20 @@ private fun PlayerContent(
         )
     }
 
+    // 文件夹内视频切换列表
+    if (showPlaylistSheet) {
+        ModalBottomSheet(onDismissRequest = { showPlaylistSheet = false }) {
+            PlaylistSheetContent(
+                videos = state.playlist,
+                currentVideoId = state.video?.id ?: -1,
+                onSelect = { video ->
+                    showPlaylistSheet = false
+                    viewModel.switchToVideo(video.id)
+                },
+            )
+        }
+    }
+
     if (showSpeedSheet) {
         ModalBottomSheet(onDismissRequest = { showSpeedSheet = false }) {
             SpeedSheetContent(
@@ -318,6 +340,7 @@ private fun ControlsOverlay(
     onDragEnd: () -> Unit,
     onSpeedClick: () -> Unit,
     onToggleFullscreen: () -> Unit,
+    onPlaylistClick: () -> Unit,
     onBack: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
@@ -340,6 +363,11 @@ private fun ControlsOverlay(
                 maxLines = 1,
                 modifier = Modifier.weight(1f),
             )
+            if (state.playlist.size > 1) {
+                IconButton(onClick = onPlaylistClick) {
+                    Icon(Icons.Filled.PlaylistPlay, contentDescription = "文件夹内视频切换", tint = Color.White)
+                }
+            }
         }
 
         // 中央：播放/暂停 + 快进快退
@@ -421,6 +449,56 @@ private fun ControlsOverlay(
                 }
             }
         }
+    }
+}
+
+@Composable
+private fun PlaylistSheetContent(
+    videos: List<com.vidnest.app.domain.model.Video>,
+    currentVideoId: Long,
+    onSelect: (com.vidnest.app.domain.model.Video) -> Unit,
+) {
+    Column(modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)) {
+        Text(
+            text = "文件夹内视频（${videos.size}）",
+            style = MaterialTheme.typography.titleMedium,
+        )
+        Spacer(Modifier.height(8.dp))
+        LazyColumn(modifier = Modifier.height(360.dp)) {
+            items(videos, key = { it.id }) { video ->
+                val playing = video.id == currentVideoId
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clickable { onSelect(video) }
+                        .padding(vertical = 10.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Column(Modifier.weight(1f)) {
+                        Text(
+                            text = video.displayName,
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = if (playing) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                        )
+                        Text(
+                            text = "${Formatters.durationOrUnknown(video.durationMs)} · 已播放 ${video.playback?.playCount ?: 0} 次",
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                    }
+                    if (playing) {
+                        Text(
+                            text = "正在播放",
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.primary,
+                        )
+                    }
+                }
+            }
+        }
+        Spacer(Modifier.height(16.dp))
     }
 }
 

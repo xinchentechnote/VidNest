@@ -11,6 +11,7 @@ import com.vidnest.app.data.settings.SettingsRepository
 import com.vidnest.app.domain.model.EndBehavior
 import com.vidnest.app.domain.model.ResumeBehavior
 import com.vidnest.app.domain.model.Video
+import com.vidnest.app.domain.model.VideoSortField
 import com.vidnest.app.domain.policy.ProgressPolicy
 import com.vidnest.app.playback.PlaybackCoordinator
 import com.vidnest.app.playback.PlayerController
@@ -20,6 +21,8 @@ import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.flatMapLatest
+import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 
@@ -44,10 +47,12 @@ data class PlayerUiState(
     val pendingResumeAsk: Long? = null,
     /** 已看完视频打开询问（EndBehavior.ASK） */
     val pendingEndAsk: Boolean = false,
+    /** 同文件夹内的视频（播放列表，供切换） */
+    val playlist: List<Video> = emptyList(),
 )
 
 class PlayerViewModel(
-    private val videoId: Long,
+    initialVideoId: Long,
     private val videoRepository: VideoRepository,
     private val recordRepository: PlaybackRecordRepository,
     private val sessionRepository: PlaybackSessionRepository,
@@ -60,6 +65,13 @@ class PlayerViewModel(
 
     private val coordinator = PlaybackCoordinator(recordRepository, sessionRepository, writer)
 
+    /** 当前播放的视频（播放列表切换时会变化）；所有落库以它为准，防止新旧视频串号 */
+    private var currentVideoId: Long = initialVideoId
+
+    /** 切换视频期间忽略 tick，避免旧视频的位置写入新视频的记录 */
+    @Volatile
+    private var switching = false
+
     private val videoState = MutableStateFlow<Video?>(null)
     private val resumeHint = MutableStateFlow<Long?>(null)
     private val videoUnavailable = MutableStateFlow(false)
@@ -70,6 +82,11 @@ class PlayerViewModel(
 
     private var endedHandled = false
 
+    private val playlistFlow = videoState.flatMapLatest { video ->
+        if (video == null) flowOf(emptyList<Video>())
+        else videoRepository.observeFolderVideos(video.folderPath, VideoSortField.NAME)
+    }
+
     val uiState: StateFlow<PlayerUiState> = combine(
         videoState,
         controller.state,
@@ -78,6 +95,7 @@ class PlayerViewModel(
         playerError,
         pendingResumeAsk,
         pendingEndAsk,
+        playlistFlow,
     ) { values ->
         @Suppress("UNCHECKED_CAST")
         val video = values[0] as Video?
@@ -87,6 +105,7 @@ class PlayerViewModel(
         val error = values[4] as PlayerErrorInfo?
         val resumeAsk = values[5] as Long?
         val endAsk = values[6] as Boolean
+        val playlist = values[7] as List<Video>
         PlayerUiState(
             video = video,
             isPlaying = cs.isPlaying,
@@ -100,6 +119,7 @@ class PlayerViewModel(
             videoUnavailable = unavailable,
             pendingResumeAsk = resumeAsk,
             pendingEndAsk = endAsk,
+            playlist = playlist,
         )
     }.stateIn(viewModelScope, SharingStarted.Eagerly, PlayerUiState())
 
@@ -107,15 +127,16 @@ class PlayerViewModel(
         controller.tickListener = ::onControllerTick
 
         viewModelScope.launch {
-            val video = videoRepository.getVideo(videoId)
+            val video = videoRepository.getVideo(currentVideoId)
             if (video == null || video.isMissing) {
                 videoState.value = video
                 videoUnavailable.value = true
                 return@launch
             }
             videoState.value = video
+            currentVideoId = video.id
 
-            val record = recordRepository.get(videoId)
+            val record = recordRepository.get(currentVideoId)
             val resumeBehavior = settingsRepository.resumeBehavior.first()
             val endBehavior = settingsRepository.endBehavior.first()
             val rememberSpeed = settingsRepository.rememberSpeed.first()
@@ -171,7 +192,7 @@ class PlayerViewModel(
                         isFileMissing = isIo,
                     )
                     if (isIo) {
-                        videoRepository.markMissing(videoId)
+                        videoRepository.markMissing(currentVideoId)
                     }
                 }
             }
@@ -179,6 +200,7 @@ class PlayerViewModel(
     }
 
     private fun onControllerTick(positionMs: Long, durationMs: Long, isPlaying: Boolean, mediaDeltaMs: Long) {
+        if (switching) return
         coordinator.onTick(
             positionMs = positionMs,
             durationMs = durationMs,
@@ -194,9 +216,46 @@ class PlayerViewModel(
         pendingEndAsk.value = false
         val video = videoState.value ?: return
         viewModelScope.launch {
-            coordinator.begin(videoId, positionMs)
+            coordinator.begin(currentVideoId, positionMs)
             resumeHint.value = positionMs.takeIf { it >= RESUME_HINT_THRESHOLD_MS }
             controller.load(video.contentUri, positionMs, speed = initialSpeed)
+        }
+    }
+
+    /**
+     * 播放列表切换：先 flush 当前视频断点（串行队列），再装载新视频并恢复其断点。
+     * switching 闸门保证切换窗口内的旧 tick 不会写入新视频记录（防串号）。
+     */
+    fun switchToVideo(targetId: Long) {
+        if (targetId == currentVideoId) return
+        switching = true
+        coordinator.onSwitchAway()
+        endedHandled = false
+        playerError.value = null
+        resumeHint.value = null
+        pendingResumeAsk.value = null
+        pendingEndAsk.value = false
+        currentVideoId = targetId
+        viewModelScope.launch {
+            val video = videoRepository.getVideo(targetId)
+            if (video == null || video.isMissing) {
+                switching = false
+                videoUnavailable.value = true
+                return@launch
+            }
+            videoUnavailable.value = false
+            videoState.value = video
+            val record = recordRepository.get(targetId)
+            val resume = ProgressPolicy.resolveResumePosition(
+                savedPositionMs = record?.positionMs ?: 0,
+                savedDurationMs = record?.durationMs ?: 0,
+                mediaDurationMs = video.durationMs,
+                completed = record?.completed == true,
+            )
+            resumeHint.value = resume.takeIf { it >= RESUME_HINT_THRESHOLD_MS }
+            coordinator.begin(targetId, resume)
+            controller.load(video.contentUri, resume, speed = controller.state.value.speed)
+            switching = false
         }
     }
 

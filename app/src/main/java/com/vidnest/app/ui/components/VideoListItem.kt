@@ -100,7 +100,7 @@ fun VideoListItem(
                 }
                 if (video.watchStatus == WatchStatus.WATCHING && video.playback != null) {
                     Text(
-                        text = "上次 ${Formatters.duration(video.playback.positionMs)}",
+                        text = "已看 ${Formatters.duration(video.playback.positionMs)}",
                         style = MaterialTheme.typography.labelSmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )

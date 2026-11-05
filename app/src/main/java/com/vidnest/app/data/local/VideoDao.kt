@@ -95,6 +95,20 @@ interface VideoDao {
     )
     fun observeDirectoryRows(path: String, pathPrefix: String): Flow<List<FolderRow>>
 
+    /**
+     * 自愈兜底：按最后一段目录名查找目录行（导航路径字符串因历史解码 bug
+     * 或 ROM 差异与数据库不一致时，用于重新定位真实路径）。
+     */
+    @Query(
+        "SELECT v.relativePath AS relativePath, COUNT(*) AS videoCount, " +
+            "SUM(v.sizeBytes) AS totalBytes, MAX(r.lastPlayedAt) AS lastPlayedAt " +
+            "FROM videos v LEFT JOIN playback_records r ON r.videoId = v.id " +
+            "WHERE v.availabilityStatus = ${VideoEntity.STATUS_AVAILABLE} " +
+            "AND (v.relativePath = :dirName OR v.relativePath LIKE '%/' || :dirNameEscaped) " +
+            "GROUP BY v.relativePath"
+    )
+    fun findDirectoryRowsByName(dirName: String, dirNameEscaped: String): Flow<List<FolderRow>>
+
     /** 搜索/排序/目录过滤统一走 RawQuery（见 VideoRepository 组装），两张表变化都会触发重发 */
     @RawQuery(observedEntities = [VideoEntity::class])
     fun observeVideoRows(query: SupportSQLiteQuery): Flow<List<VideoWithRecordRow>>

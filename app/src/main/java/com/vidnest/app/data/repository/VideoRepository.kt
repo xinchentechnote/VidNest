@@ -13,6 +13,7 @@ import com.vidnest.app.domain.model.VideoSortField
 import com.vidnest.app.domain.model.folderDisplayName
 import com.vidnest.app.domain.model.toDomain
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.CoroutineDispatcher
@@ -38,6 +39,23 @@ class VideoRepository(
     fun observeChildFolders(path: String): Flow<List<FolderInfo>> =
         videoDao.observeDirectoryRows(path, escapeLike(path) + "/%")
             .map { rows -> groupFolders(rows, path = path) }
+
+    /**
+     * 自愈兜底：按最后一段目录名查找真实路径（取最短匹配 = 最顶层）。
+     * 找不到返回 null。dirName 需为转义后的 LIKE 字面量调用方传入，
+     * 这里同时提供原始名精确匹配。
+     */
+    suspend fun findFolderPathByName(dirName: String): String? =
+        withContext(ioDispatcher) {
+            val escaped = escapeLike(dirName)
+            videoDao.findDirectoryRowsByName(dirName, escaped)
+                .first()
+                .filter {
+                    it.relativePath == dirName || it.relativePath.endsWith("/$dirName")
+                }
+                .minByOrNull { it.relativePath }
+                ?.relativePath
+        }
 
     /**
      * 把精确目录行聚合为直接子目录：

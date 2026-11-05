@@ -122,8 +122,15 @@ class MediaStoreVideoSource(private val context: Context) : VideoSource {
             relativePath: String,
             volumeName: String,
         ): ScannedVideo {
-            val folder = relativePath.trimEnd('/').ifBlank {
-                computeRelativePathFromData(dataPath)
+            // 优先用 DATA（真实文件路径）推导目录：
+            // 网盘等应用下载后用文件 API 移动文件，MediaStore 的 RELATIVE_PATH
+            // 可能停留在旧位置（华为机型实测），导致目录树与文件管理器不一致。
+            // DATA 无法识别（未知存储卷）时回落 RELATIVE_PATH，再回落 unknown。
+            val derived = computeRelativePathFromData(dataPath)
+            val folder = if (derived.isBlank() || derived == UNKNOWN_FOLDER) {
+                relativePath.trimEnd('/').ifBlank { UNKNOWN_FOLDER }
+            } else {
+                derived
             }
             return ScannedVideo(
                 mediaStoreId = mediaStoreId,

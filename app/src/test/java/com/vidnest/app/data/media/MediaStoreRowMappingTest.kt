@@ -12,7 +12,8 @@ import org.robolectric.annotation.Config
 class MediaStoreRowMappingTest {
 
     @Test
-    fun `API29目录直接使用RELATIVE_PATH`() {
+    fun `目录优先从DATA推导_与文件管理器一致`() {
+        // RELATIVE_PATH 可能因网盘移动文件而过期（华为实测），DATA 才是真实位置
         val row = MediaStoreVideoSource.mapRow(
             mediaStoreId = 1,
             displayName = "a.mp4",
@@ -21,7 +22,24 @@ class MediaStoreRowMappingTest {
             width = 0,
             height = 0,
             dateModified = 1,
-            dataPath = "/storage/emulated/0/DCIM/Camera/a.mp4",
+            dataPath = "/storage/emulated/0/Download/BaiduNetdisk/2024/a.mp4",
+            relativePath = "Movies/BaiduNetdisk/smooth_video_480p/download/",
+            volumeName = "external_primary",
+        )
+        assertEquals("Download/BaiduNetdisk/2024", row.relativePath)
+    }
+
+    @Test
+    fun `DATA推导失败时回落RELATIVE_PATH`() {
+        val row = MediaStoreVideoSource.mapRow(
+            mediaStoreId = 1,
+            displayName = "a.mp4",
+            sizeBytes = 1,
+            durationMs = 1,
+            width = 0,
+            height = 0,
+            dateModified = 1,
+            dataPath = "/mnt/unknown_volume/a.mp4",
             relativePath = "DCIM/Camera/",
             volumeName = "external_primary",
         )

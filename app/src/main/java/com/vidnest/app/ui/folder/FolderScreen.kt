@@ -82,12 +82,23 @@ fun FolderScreen(
                 .padding(padding),
         ) {
             if (state.subFolders.isEmpty() && state.videos.isEmpty()) {
-                Text(
-                    text = "该目录暂无视频",
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                Column(
                     modifier = Modifier.align(Alignment.Center),
-                )
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                ) {
+                    Text(
+                        text = "该目录暂无视频",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                    Text(
+                        text = "（索引路径：${state.folderPath}）\n可在设置中重新扫描刷新索引",
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f),
+                        textAlign = androidx.compose.ui.text.style.TextAlign.Center,
+                        modifier = Modifier.padding(top = 8.dp),
+                    )
+                }
             } else {
                 LazyColumn(modifier = Modifier.fillMaxSize()) {
                     if (state.subFolders.isNotEmpty()) {

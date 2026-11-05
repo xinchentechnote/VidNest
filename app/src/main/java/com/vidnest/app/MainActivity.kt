@@ -173,7 +173,7 @@ class MainActivity : ComponentActivity() {
             composable(Routes.folderPattern()) { entry ->
                 val path = entry.arguments?.getString("path").orEmpty()
                 FolderScreen(
-                    folderPath = android.net.Uri.decode(path),
+                    folderPath = path,
                     onBack = { navController.popBackStack() },
                     onVideoClick = { videoId -> navController.navigate(Routes.player(videoId)) },
                     onVideoInfoClick = { videoId -> navController.navigate(Routes.detail(videoId)) },

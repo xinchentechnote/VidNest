@@ -1,7 +1,7 @@
 package com.vidnest.app.data.repository
 
 import androidx.sqlite.db.SimpleSQLiteQuery
-import com.vidnest.app.data.local.FolderSegmentRow
+import com.vidnest.app.data.local.FolderRow
 import com.vidnest.app.data.local.VideoDao
 import com.vidnest.app.data.local.VideoEntity
 import com.vidnest.app.data.local.PlaybackRecordEntity
@@ -27,13 +27,68 @@ class VideoRepository(
     private val ioDispatcher: CoroutineDispatcher = Dispatchers.IO,
 ) {
 
-    /** 根目录层级：库首页展示（如 DCIM / Movies / Download），计数含全部子目录 */
+    /**
+     * 层级浏览：目录行聚合后在本层完成分段（含全部子层级计数）。
+     * 根目录：按路径第一段分组。
+     */
     fun observeRootFolders(): Flow<List<FolderInfo>> =
-        videoDao.observeRootFolderRows().map { rows -> rows.map { it.toDomain(null) } }
+        videoDao.observeAllDirectoryRows().map { rows -> groupFolders(rows, path = null) }
 
     /** 子目录层级：文件夹页展示当前目录下的直接子目录 */
     fun observeChildFolders(path: String): Flow<List<FolderInfo>> =
-        videoDao.observeChildFolderRows(path, path.length).map { rows -> rows.map { it.toDomain(path) } }
+        videoDao.observeDirectoryRows(path, escapeLike(path) + "/%")
+            .map { rows -> groupFolders(rows, path = path) }
+
+    /**
+     * 把精确目录行聚合为直接子目录：
+     * - relativePath == path 的行计入“当前目录直含视频数”；
+     * - 其余行按下一级段名归组（计数含其全部子层级）。
+     */
+    private fun groupFolders(rows: List<FolderRow>, path: String?): List<FolderInfo> {
+        data class Agg(var count: Int = 0, var bytes: Long = 0, var lastPlayedAt: Long? = null)
+
+        val children = LinkedHashMap<String, Agg>()
+        var directCount = 0
+        var directBytes = 0L
+        var directLastPlayedAt: Long? = null
+        val prefix = path?.let { "$it/" } ?: ""
+
+        for (row in rows) {
+            val playedAt = row.lastPlayedAt
+            if (path != null && row.relativePath == path) {
+                directCount += row.videoCount
+                directBytes += row.totalBytes ?: 0
+                if (playedAt != null &&
+                    (directLastPlayedAt == null || playedAt > directLastPlayedAt)
+                ) {
+                    directLastPlayedAt = playedAt
+                }
+                continue
+            }
+            val rest = row.relativePath.removePrefix(prefix)
+            val segment = rest.substringBefore('/')
+            val agg = children.getOrPut(segment) { Agg() }
+            agg.count += row.videoCount
+            agg.bytes += row.totalBytes ?: 0
+            val currentBest = agg.lastPlayedAt
+            if (playedAt != null && (currentBest == null || playedAt > currentBest)) {
+                agg.lastPlayedAt = playedAt
+            }
+        }
+
+        val result = children.map { (segment, agg) ->
+            val fullPath = path?.let { "$it/$segment" } ?: segment
+            FolderInfo(
+                path = fullPath,
+                displayName = segment,
+                videoCount = agg.count,
+                totalBytes = agg.bytes,
+                lastPlayedAtMs = agg.lastPlayedAt,
+            )
+        }
+        // path 非空时直含视频数并入当前目录不展示；根目录不需要 direct 概念
+        return result
+    }
 
     fun observeFolderVideos(path: String, sort: VideoSortField): Flow<List<Video>> =
         videoDao.observeVideoRows(buildQuery(sort, folderPath = path)).map { it.toDomainList() }
@@ -78,17 +133,6 @@ class VideoRepository(
     suspend fun countMissing(): Int = withContext(ioDispatcher) { videoDao.countMissing() }
 
     suspend fun getMissing(): List<VideoEntity> = withContext(ioDispatcher) { videoDao.getMissing() }
-
-    private fun FolderSegmentRow.toDomain(parentPath: String?): FolderInfo {
-        val fullPath = parentPath?.let { "$it/$segment" } ?: segment
-        return FolderInfo(
-            path = fullPath,
-            displayName = segment,
-            videoCount = videoCount,
-            totalBytes = totalBytes ?: 0L,
-            lastPlayedAtMs = lastPlayedAt,
-        )
-    }
 
     private fun List<VideoWithRecordRow>.toDomainList(): List<Video> =
         map { row -> row.video.toDomain(row.record?.toRecordEntity()) }

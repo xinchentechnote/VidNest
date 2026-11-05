@@ -47,9 +47,9 @@ enum class Availability {
     MISSING,
 }
 
-/** 层级浏览的目录段聚合行（按路径某一段分组，计数含其全部子目录） */
-data class FolderSegmentRow(
-    @ColumnInfo(name = "segment") val segment: String,
+/** 目录行聚合（每个精确目录一行；层级分段在 Kotlin 层完成） */
+data class FolderRow(
+    @ColumnInfo(name = "relativePath") val relativePath: String,
     @ColumnInfo(name = "videoCount") val videoCount: Int,
     @ColumnInfo(name = "totalBytes") val totalBytes: Long?,
     @ColumnInfo(name = "lastPlayedAt") val lastPlayedAt: Long?,

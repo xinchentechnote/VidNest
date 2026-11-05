@@ -69,26 +69,31 @@ interface VideoDao {
     @Query("SELECT * FROM videos WHERE availabilityStatus = ${VideoEntity.STATUS_MISSING}")
     suspend fun getMissing(): List<VideoEntity>
 
-    /** 根目录层级聚合：按路径第一段分组，数量/大小含全部子目录（层级浏览入口） */
+    /**
+     * 全量目录行聚合（每个精确目录一行）。
+     * 层级分段在 Kotlin 层完成——SQLite substr 的码点计数与 Kotlin UTF-16 长度
+     * 在含 emoji 等增补字符的路径上会错位，严禁在 SQL 里做子串分段。
+     * LIKE 通配符由调用方转义（ESCAPE '\'）。
+     */
     @Query(
-        "SELECT substr(v.relativePath, 1, instr(v.relativePath || '/', '/') - 1) AS segment, " +
-            "COUNT(*) AS videoCount, SUM(v.sizeBytes) AS totalBytes, MAX(r.lastPlayedAt) AS lastPlayedAt " +
+        "SELECT v.relativePath AS relativePath, COUNT(*) AS videoCount, " +
+            "SUM(v.sizeBytes) AS totalBytes, MAX(r.lastPlayedAt) AS lastPlayedAt " +
             "FROM videos v LEFT JOIN playback_records r ON r.videoId = v.id " +
             "WHERE v.availabilityStatus = ${VideoEntity.STATUS_AVAILABLE} " +
-            "GROUP BY segment"
+            "GROUP BY v.relativePath"
     )
-    fun observeRootFolderRows(): Flow<List<FolderSegmentRow>>
+    fun observeAllDirectoryRows(): Flow<List<FolderRow>>
 
-    /** 子目录层级聚合：path 的直接子目录段，数量含其全部子目录 */
+    /** 指定目录（自身 + 前缀匹配）的目录行聚合 */
     @Query(
-        "SELECT substr(v.relativePath, :pathLen + 2, instr(substr(v.relativePath, :pathLen + 2) || '/', '/') - 1) AS segment, " +
-            "COUNT(*) AS videoCount, SUM(v.sizeBytes) AS totalBytes, MAX(r.lastPlayedAt) AS lastPlayedAt " +
+        "SELECT v.relativePath AS relativePath, COUNT(*) AS videoCount, " +
+            "SUM(v.sizeBytes) AS totalBytes, MAX(r.lastPlayedAt) AS lastPlayedAt " +
             "FROM videos v LEFT JOIN playback_records r ON r.videoId = v.id " +
             "WHERE v.availabilityStatus = ${VideoEntity.STATUS_AVAILABLE} " +
-            "AND v.relativePath != :path AND v.relativePath LIKE :path || '/%' " +
-            "GROUP BY segment"
+            "AND (v.relativePath = :path OR v.relativePath LIKE :pathPrefix ESCAPE '\\') " +
+            "GROUP BY v.relativePath"
     )
-    fun observeChildFolderRows(path: String, pathLen: Int): Flow<List<FolderSegmentRow>>
+    fun observeDirectoryRows(path: String, pathPrefix: String): Flow<List<FolderRow>>
 
     /** 搜索/排序/目录过滤统一走 RawQuery（见 VideoRepository 组装），两张表变化都会触发重发 */
     @RawQuery(observedEntities = [VideoEntity::class])

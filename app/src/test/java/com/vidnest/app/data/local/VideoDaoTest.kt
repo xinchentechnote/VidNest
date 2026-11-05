@@ -121,10 +121,16 @@ class VideoDaoTest {
 
     @Test
     fun `根目录层级聚合包含子目录的数量与大小`() = runTest {
-        val v1 = video(uri = "content://media/1", path = "Movies", name = "a.mp4", size = 100)
-        val v2 = video(uri = "content://media/2", path = "Movies/sub", name = "b.mp4", size = 300)
-        val v3 = video(uri = "content://media/3", path = "DCIM/Camera", name = "c.mp4", size = 50)
-        videoDao.upsertAll(listOf(v1, v2, v3))
+        val repo = com.vidnest.app.data.repository.VideoRepository(videoDao)
+        videoDao.upsertAll(
+            listOf(
+                video(uri = "content://media/1", path = "Movies", name = "a.mp4", size = 100),
+                video(uri = "content://media/2", path = "Movies/sub", name = "b.mp4", size = 300),
+                video(uri = "content://media/3", path = "DCIM/Camera", name = "c.mp4", size = 50),
+                // 含 % _ emoji 的目录名（LIKE 通配符与 Unicode 分段回归）
+                video(uri = "content://media/4", path = "100%高清/考点+难点 📚", name = "d.mp4", size = 10),
+            ),
+        )
         val id1 = videoDao.getByUri("content://media/1")!!.id
         recordDao.upsert(
             PlaybackRecordEntity(
@@ -132,29 +138,32 @@ class VideoDaoTest {
                 lastPlayedAt = 555, completed = false, lastPlaybackSpeed = null, updatedAt = 555,
             ),
         )
-        // 根目录：Movies 与 DCIM，计数含子目录
-        val roots = videoDao.observeRootFolderRows().first()
-        assertEquals(2, roots.size)
-        val movies = roots.first { it.segment == "Movies" }
-        assertEquals(2, movies.videoCount)
+        val roots = repo.observeRootFolders().first()
+        assertEquals(3, roots.size)
+        val movies = roots.first { it.displayName == "Movies" }
+        assertEquals(2, movies.videoCount) // 含子目录
         assertEquals(400L, movies.totalBytes)
-        assertEquals(555L, movies.lastPlayedAt)
-        assertEquals(1, roots.first { it.segment == "DCIM" }.videoCount)
+        assertEquals(555L, movies.lastPlayedAtMs)
+        assertEquals(1, roots.first { it.displayName == "DCIM" }.videoCount)
+        assertEquals(1, roots.first { it.displayName == "100%高清" }.videoCount)
 
-        // 子目录：Movies 下的直接子目录段
-        val children = videoDao.observeChildFolderRows("Movies", "Movies".length).first()
+        // 子目录：Movies 下的直接子目录
+        val children = repo.observeChildFolders("Movies").first()
         assertEquals(1, children.size)
-        assertEquals("sub", children.first().segment)
+        assertEquals("Movies/sub", children.first().path)
+        assertEquals("sub", children.first().displayName)
         assertEquals(1, children.first().videoCount)
-        // DCIM 下的子目录
-        assertEquals("Camera", videoDao.observeChildFolderRows("DCIM", "DCIM".length).first().first().segment)
+        // 含 % 的路径：子目录查询不受通配符影响
+        val tricky = repo.observeChildFolders("100%高清").first()
+        assertEquals(1, tricky.size)
+        assertEquals("考点+难点 📚", tricky.first().displayName)
     }
 
     @Test
     fun `根目录无子目录时子目录查询为空`() = runTest {
+        val repo = com.vidnest.app.data.repository.VideoRepository(videoDao)
         videoDao.upsertAll(listOf(video(uri = "content://media/1", path = "Movies", name = "a.mp4")))
-        val children = videoDao.observeChildFolderRows("Movies", "Movies".length).first()
-        assertTrue(children.isEmpty())
+        assertTrue(repo.observeChildFolders("Movies").first().isEmpty())
     }
 
     @Test
@@ -170,7 +179,8 @@ class VideoDaoTest {
         )
         videoDao.markMissingByScanBatch(scanBatch = 200, volumeNames = listOf("external_primary"))
         assertEquals(VideoEntity.STATUS_MISSING, videoDao.getById(id)!!.availabilityStatus)
-        assertEquals(0, videoDao.observeRootFolderRows().first().size)
+        val repo = com.vidnest.app.data.repository.VideoRepository(videoDao)
+        assertEquals(0, repo.observeRootFolders().first().size)
         // 记录仍在
         assertNotNull(recordDao.get(id))
     }
